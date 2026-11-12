@@ -210,7 +210,8 @@ input:focus, select:focus, textarea:focus{outline:none;border-color:var(--leaf);
 .row-inline{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .stack{display:grid;gap:13px;margin-top:15px}
 
-.foot{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#8a978d;font-size:12px}
+.foot{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#8a978d;font-size:12px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.build{color:#9aa79c;white-space:nowrap}
 
 .modal{position:fixed;inset:0;z-index:60;background:rgba(9,20,14,.52);display:grid;place-items:center;padding:22px;overflow:auto;animation:fade .15s ease both}
 @keyframes fade{from{opacity:0}to{opacity:1}}
@@ -548,7 +549,8 @@ textarea{resize:vertical;min-height:96px;line-height:1.45}
   </section>
 
   <footer class="foot">
-    <span>Данные хранятся только в этом браузере. Экспортируйте рецепты в JSON, чтобы не потерять.</span>
+    <span>Данные хранятся в этом браузере. «Общая библиотека» синхронизирует продукты, план и рецепты между устройствами.</span>
+    <span class="build">сборка v3 · 13.11</span>
   </footer>
 </main>
 
@@ -859,7 +861,8 @@ function defaultState() {
     fav: [],
     tombstones: [],
     prefs: { days: 5, meals: ['breakfast', 'lunch', 'dinner'], portions: 2, veg: false, fish: false, quick: false, kidMenu: false, kidPortions: 1 },
-    plan: null
+    plan: null,
+    syncMeta: { pantry: 0, plan: 0, fav: 0, prefs: 0 }
   };
 }
 function normalizeRecipe(raw, builtin) {
@@ -928,7 +931,8 @@ function loadState() {
       fav: Array.isArray(p.fav) ? p.fav : [],
       tombstones: Array.isArray(p.tombstones) ? p.tombstones.slice(-500) : [],
       prefs: Object.assign({}, base.prefs, p.prefs || {}),
-      plan: p.plan && Array.isArray(p.plan.slots) ? p.plan : null
+      plan: p.plan && Array.isArray(p.plan.slots) ? p.plan : null,
+      syncMeta: Object.assign({}, base.syncMeta, p.syncMeta || {})
     };
   } catch (err) {
     return base;
@@ -944,6 +948,10 @@ function saveState() {
     if (!storageWarned) { storageWarned = true; toast('Браузер не разрешил сохранение — данные живут до закрытия вкладки'); }
     return false;
   }
+}
+function touch(key) {
+  if (!S.syncMeta) S.syncMeta = { pantry: 0, plan: 0, fav: 0, prefs: 0 };
+  S.syncMeta[key] = Date.now();
 }
 let builtinCache = null;
 const KID_IDS = new Set(['b1', 'b2', 'b3', 'b4', 'b6', 'b7', 'b8', 'b9', 'b10', 'l2', 'l3', 'l6', 'l9', 'l11', 'l13', 'l14', 'l15', 'l18', 'l20', 'l23', 's1', 's3', 's4', 's5', 's7']);
@@ -1073,7 +1081,9 @@ function fillDemo() {
     ['творог', 400, 'г', 4], ['овсянка', 400, 'г', 180], ['спагетти', 400, 'г', 200]
   ];
   demo.forEach((d) => addProductToPantry(d[0], d[1], d[2], d[3]));
+  touch('pantry');
   saveState();
+  scheduleSync();
   refresh();
   toast('Пример заполнен — меняйте под себя');
 }
@@ -1228,7 +1238,9 @@ function buildPlan() {
   }
   const kidCount = slots.filter((s) => s.kid).length;
   S.plan = { days, slots, created: Date.now() };
+  touch('plan');
   saveState();
+  scheduleSync();
   refresh();
   if (S.prefs.kidMenu && !kidPool.length) {
     toast('План собран, но для детского меню нет подходящих рецептов');
@@ -1376,7 +1388,10 @@ function cookSlot(idx) {
   });
   S.pantry = S.pantry.filter((p) => p.qty > 0.0001);
   slot.cooked = true;
+  touch('pantry');
+  touch('plan');
   saveState();
+  scheduleSync();
   refresh();
   toast('«' + r.title + '» — продукты списаны с полки');
 }
@@ -1658,7 +1673,9 @@ function exportRecipes() {
 function toggleFav(id) {
   const i = S.fav.indexOf(id);
   if (i >= 0) S.fav.splice(i, 1); else S.fav.push(id);
+  touch('fav');
   saveState();
+  scheduleSync();
   const btn = $('[data-fav="' + id + '"]');
   if (btn) btn.textContent = S.fav.includes(id) ? 'Убрать из избранного' : 'В избранное';
   renderRecipes();
@@ -1707,6 +1724,7 @@ let syncQueued = false;
 let syncTimer = null;
 let syncError = false;
 let syncBusy = false;
+let lastSyncTry = 0;
 
 function loadSync() {
   try {
@@ -1750,12 +1768,22 @@ function libRecipe(r) {
 }
 function libPayload() {
   return {
-    v: 1,
+    v: 2,
     app: 'polka',
     updatedAt: new Date().toISOString(),
     recipes: S.custom.map(libRecipe),
-    tombstones: S.tombstones.slice(-500)
+    tombstones: S.tombstones.slice(-500),
+    pantry: S.pantry,
+    fav: S.fav,
+    plan: S.plan,
+    prefs: S.prefs,
+    meta: S.syncMeta || {}
   };
+}
+function sectionHasData(v) {
+  if (Array.isArray(v)) return v.length > 0;
+  if (v && typeof v === 'object') return Object.keys(v).length > 0;
+  return v !== null && v !== undefined && v !== '';
 }
 function mergeLib(local, remote) {
   const map = new Map();
@@ -1782,13 +1810,46 @@ function mergeLib(local, remote) {
       }
       recipes.push(r);
     });
-  return { v: 1, app: 'polka', updatedAt: new Date().toISOString(), recipes, tombstones: Array.from(tomb).slice(-500) };
+  const out = { v: 2, app: 'polka', updatedAt: new Date().toISOString(), recipes, tombstones: Array.from(tomb).slice(-500), meta: {} };
+  ['pantry', 'fav', 'plan', 'prefs'].forEach((key) => {
+    const lm = Number((local.meta || {})[key]) || 0;
+    const rm = Number((remote.meta || {})[key]) || 0;
+    const hasRemote = remote[key] !== undefined && remote[key] !== null;
+    const hasLocal = local[key] !== undefined && local[key] !== null;
+    if (!hasRemote && !hasLocal) return;
+    if (!hasRemote) { out[key] = local[key]; out.meta[key] = lm; return; }
+    if (!hasLocal) { out[key] = remote[key]; out.meta[key] = rm; return; }
+    if (rm > lm) { out[key] = remote[key]; out.meta[key] = rm; return; }
+    if (lm > rm) { out[key] = local[key]; out.meta[key] = lm; return; }
+    if (sectionHasData(local[key]) && !sectionHasData(remote[key])) { out[key] = local[key]; out.meta[key] = lm; return; }
+    out[key] = remote[key];
+    out.meta[key] = rm;
+  });
+  return out;
 }
 function applyLib(data) {
-  const merged = mergeLib({ v: 1, recipes: S.custom.map(libRecipe), tombstones: S.tombstones }, data);
+  const before = JSON.stringify({ pantry: S.pantry, fav: S.fav, plan: S.plan, prefs: S.prefs });
+  const merged = mergeLib({
+    v: 2,
+    recipes: S.custom.map(libRecipe),
+    tombstones: S.tombstones,
+    pantry: S.pantry,
+    fav: S.fav,
+    plan: S.plan,
+    prefs: S.prefs,
+    meta: S.syncMeta
+  }, data);
   S.custom = merged.recipes.map((r) => normalizeRecipe(r, false)).filter(Boolean);
   S.tombstones = merged.tombstones.slice(-500);
+  if (merged.pantry) S.pantry = merged.pantry;
+  if (merged.fav) S.fav = merged.fav;
+  if (merged.plan !== undefined) S.plan = merged.plan;
+  if (merged.prefs) S.prefs = Object.assign({}, S.prefs, merged.prefs);
+  if (merged.meta) S.syncMeta = Object.assign({}, S.syncMeta, merged.meta);
   saveState();
+  refresh();
+  const after = JSON.stringify({ pantry: S.pantry, fav: S.fav, plan: S.plan, prefs: S.prefs });
+  if (before !== after) toast('Обновлено с другого устройства');
 }
 
 async function gh(path, opts, token) {
@@ -1885,6 +1946,15 @@ async function syncNow(opts) {
     syncing = false;
     if (syncQueued) { syncQueued = false; scheduleSync(); }
   }
+}
+
+function maybeSync(maxAge) {
+  if (!syncReady() || document.hidden) return;
+  const now = Date.now();
+  if (now - lastSyncTry < 15000) return;
+  if (SYNC.lastSync && now - SYNC.lastSync < maxAge) return;
+  lastSyncTry = now;
+  syncNow({ silent: true });
 }
 
 async function createLibrary() {
@@ -2040,7 +2110,7 @@ function openSync() {
   const head = '<p class="eyebrow">Синхронизация</p><h2 id="modal-title">Общая библиотека</h2>';
   if (syncReady()) {
     openModal(head +
-      '<p class="muted small">Ваши рецепты совпадают на всех устройствах, где введён этот код. Продукты, план и избранное остаются на каждом устройстве свои.</p>' +
+      '<p class="muted small">Рецепты, продукты, план и избранное синхронизируются между устройствами с этим кодом. Если меняли на двух устройствах сразу, победит последнее сохранённое.</p>' +
       '<div class="stack">' +
       '<div><p class="field-note">Код библиотеки</p><p class="code">' + esc(SYNC.gistId) + '</p></div>' +
       '<p class="muted small">Последняя синхронизация: ' + (SYNC.lastSync ? esc(fmtTime(SYNC.lastSync)) : 'ещё не было') + '</p>' +
@@ -2087,7 +2157,9 @@ function bindEvents() {
     const daysRaw = $('#prod-days').value.trim();
     const days = daysRaw === '' ? null : Math.max(0, Math.min(90, parseInt(daysRaw, 10) || 0));
     addProductToPantry(name, qty, unit, days);
+    touch('pantry');
     saveState();
+    scheduleSync();
     refresh();
     $('#prod-name').value = '';
     $('#prod-qty').value = '1';
@@ -2109,18 +2181,18 @@ function bindEvents() {
         S.pantry = S.pantry.filter((x) => x.id !== p.id);
         toast('Продукт убран с полки');
       }
-      saveState(); refresh();
+      touch('pantry'); saveState(); scheduleSync(); refresh();
     } else if (e.target.matches('[data-days]')) {
       const raw = e.target.value.trim();
       p.days = raw === '' ? null : Math.max(0, Math.min(90, parseInt(raw, 10) || 0));
       p.added = Date.now();
-      saveState(); refresh();
+      touch('pantry'); saveState(); scheduleSync(); refresh();
     } else if (e.target.matches('[data-name]')) {
       const v = e.target.value.trim();
       if (!v) { e.target.value = p.name; return; }
       p.name = v;
       p.cat = guessCat(v);
-      saveState(); refresh();
+      touch('pantry'); saveState(); scheduleSync(); refresh();
     }
   });
 
@@ -2129,14 +2201,14 @@ function bindEvents() {
     if (del) {
       const p = S.pantry.find((x) => x.id === del.dataset.del);
       S.pantry = S.pantry.filter((x) => x.id !== del.dataset.del);
-      saveState(); refresh();
+      touch('pantry'); saveState(); scheduleSync(); refresh();
       if (p) toast('«' + p.name + '» убран с полки');
       return;
     }
     if (e.target.id === 'demo-fill') fillDemo();
   });
 
-  $('#plan-form').addEventListener('change', () => { readPrefs(); saveState(); });
+  $('#plan-form').addEventListener('change', () => { readPrefs(); touch('prefs'); saveState(); scheduleSync(); });
   $('#pref-kid').addEventListener('change', () => {
     $('#kid-portions-wrap').hidden = !$('#pref-kid').checked;
     if (S.plan) toast('Нажмите «Пересобрать», чтобы добавить детские блюда');
@@ -2147,7 +2219,9 @@ function bindEvents() {
     const v = Math.min(14, Math.max(1, (parseInt(el.value, 10) || 5) + Number(b.dataset.step)));
     el.value = v;
     readPrefs();
+    touch('prefs');
     saveState();
+    scheduleSync();
   }));
   $('#regen').addEventListener('click', buildPlan);
 
@@ -2237,8 +2311,10 @@ function init() {
   renderRecipes();
   renderSyncBadge();
   setInterval(refreshShelf, 60000);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshShelf(); });
-  if (syncReady()) setTimeout(() => { syncNow({ silent: true }); }, 700);
+  setInterval(() => maybeSync(20000), 45000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { refreshShelf(); maybeSync(10000); } });
+  window.addEventListener('focus', () => maybeSync(10000));
+  setTimeout(() => maybeSync(0), 500);
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
