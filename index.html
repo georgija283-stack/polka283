@@ -550,7 +550,7 @@ textarea{resize:vertical;min-height:96px;line-height:1.45}
 
   <footer class="foot">
     <span>Данные хранятся в этом браузере. «Общая библиотека» синхронизирует продукты, план и рецепты между устройствами.</span>
-    <span class="build">сборка v3 · 13.11</span>
+    <span class="build">сборка v3.1 · 13.11</span>
   </footer>
 </main>
 
@@ -1725,6 +1725,7 @@ let syncTimer = null;
 let syncError = false;
 let syncBusy = false;
 let lastSyncTry = 0;
+let lastSyncErrToast = 0;
 
 function loadSync() {
   try {
@@ -1735,6 +1736,7 @@ function loadSync() {
       token: String(p.token || ''),
       gistId: String(p.gistId || ''),
       lastSync: Number(p.lastSync) || 0,
+      remote: p.remote && typeof p.remote === 'object' ? p.remote : null,
       configured: true
     };
   } catch (e) {
@@ -1743,7 +1745,7 @@ function loadSync() {
 }
 function saveSync() {
   try {
-    localStorage.setItem(SYNC_KEY, JSON.stringify({ token: SYNC.token, gistId: SYNC.gistId, lastSync: SYNC.lastSync }));
+    localStorage.setItem(SYNC_KEY, JSON.stringify({ token: SYNC.token, gistId: SYNC.gistId, lastSync: SYNC.lastSync, remote: SYNC.remote || null }));
   } catch (e) {}
 }
 function localConfig() {
@@ -1931,6 +1933,7 @@ async function syncNow(opts) {
       body: JSON.stringify({ files: { [GIST_FILE]: { content: JSON.stringify(merged, null, 2) } } })
     });
     SYNC.lastSync = Date.now();
+    SYNC.remote = { pantry: Array.isArray(merged.pantry) ? merged.pantry.length : -1, recipes: merged.recipes.length, at: Date.now() };
     saveSync();
     syncError = false;
     renderSyncBadge();
@@ -1941,6 +1944,7 @@ async function syncNow(opts) {
     syncError = true;
     renderSyncBadge();
     if (!silent) toast(e.message);
+    else if (Date.now() - lastSyncErrToast > 30000) { lastSyncErrToast = Date.now(); toast('Синхронизация: ' + e.message); }
     return false;
   } finally {
     syncing = false;
@@ -1998,7 +2002,7 @@ async function applySyncConfig(token, code) {
       method: 'PATCH',
       body: JSON.stringify({ files: { [GIST_FILE]: { content: JSON.stringify(merged, null, 2) } } })
     }, token);
-    SYNC = { token, gistId: code, lastSync: Date.now(), configured: true };
+    SYNC = { token, gistId: code, lastSync: Date.now(), configured: true, remote: { pantry: Array.isArray(merged.pantry) ? merged.pantry.length : -1, recipes: merged.recipes.length, at: Date.now() } };
     saveSync();
     applyLib(merged);
     syncError = false;
@@ -2071,6 +2075,97 @@ function exportSyncFile() {
   downloadFile(JSON.stringify(data, null, 2), 'polka-sync.json');
 }
 
+async function checkLibrary() {
+  if (!syncReady()) return;
+  setSyncErr('');
+  try {
+    const gist = await gh('/gists/' + SYNC.gistId, { method: 'GET' });
+    const remote = await readGistPayload(gist);
+    SYNC.remote = {
+      pantry: Array.isArray(remote.pantry) ? remote.pantry.length : -1,
+      recipes: (remote.recipes || []).length,
+      at: Date.now()
+    };
+    saveSync();
+    openSync();
+    toast('В библиотеке: ' + (SYNC.remote.pantry < 0 ? 'нет данных о продуктах' : SYNC.remote.pantry + ' ' + plural(SYNC.remote.pantry, 'продукт', 'продукта', 'продуктов')) + ', ' + SYNC.remote.recipes + ' ' + plural(SYNC.remote.recipes, 'рецепт', 'рецепта', 'рецептов'));
+  } catch (e) {
+    setSyncErr(e.message);
+  }
+}
+
+async function syncPush() {
+  if (!syncReady()) { openSync(); return; }
+  if (syncing) return;
+  if (!confirm('Отправить данные этого устройства в библиотеку? Данные других устройств в библиотеке будут заменены.')) return;
+  setSyncErr('');
+  syncing = true;
+  syncError = false;
+  renderSyncBadge('busy');
+  try {
+    const payload = libPayload();
+    payload.updatedAt = new Date().toISOString();
+    await gh('/gists/' + SYNC.gistId, {
+      method: 'PATCH',
+      body: JSON.stringify({ files: { [GIST_FILE]: { content: JSON.stringify(payload, null, 2) } } })
+    });
+    SYNC.lastSync = Date.now();
+    SYNC.remote = { pantry: S.pantry.length, recipes: S.custom.length, at: Date.now() };
+    saveSync();
+    syncError = false;
+    renderSyncBadge();
+    openSync();
+    toast('Данные отправлены в библиотеку');
+  } catch (e) {
+    syncError = true;
+    renderSyncBadge();
+    setSyncErr(e.message);
+  } finally {
+    syncing = false;
+  }
+}
+
+async function syncPull() {
+  if (!syncReady()) { openSync(); return; }
+  if (syncing) return;
+  if (!confirm('Заменить продукты, план, избранное и настройки данными из библиотеки?')) return;
+  setSyncErr('');
+  syncing = true;
+  syncError = false;
+  renderSyncBadge('busy');
+  try {
+    const gist = await gh('/gists/' + SYNC.gistId, { method: 'GET' });
+    const remote = await readGistPayload(gist);
+    const rec = mergeLib({ v: 2, recipes: S.custom.map(libRecipe), tombstones: S.tombstones, pantry: [], fav: [], plan: null, prefs: {}, meta: {} }, remote);
+    S.custom = rec.recipes.map((r) => normalizeRecipe(r, false)).filter(Boolean);
+    S.tombstones = rec.tombstones.slice(-500);
+    if (Array.isArray(remote.pantry)) S.pantry = remote.pantry;
+    if (Array.isArray(remote.fav)) S.fav = remote.fav;
+    if (remote.plan !== undefined) S.plan = remote.plan;
+    if (remote.prefs) S.prefs = Object.assign({}, S.prefs, remote.prefs);
+    if (remote.meta) S.syncMeta = Object.assign({}, S.syncMeta, remote.meta);
+    SYNC.lastSync = Date.now();
+    SYNC.remote = {
+      pantry: Array.isArray(remote.pantry) ? remote.pantry.length : -1,
+      recipes: (remote.recipes || []).length,
+      at: Date.now()
+    };
+    saveSync();
+    saveState();
+    refresh();
+    syncError = false;
+    renderSyncBadge();
+    openSync();
+    toast('Данные взяты из библиотеки');
+  } catch (e) {
+    syncError = true;
+    renderSyncBadge();
+    setSyncErr(e.message);
+  } finally {
+    syncing = false;
+  }
+}
+
 function fmtTime(ts) {
   try {
     return new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(ts));
@@ -2088,7 +2183,7 @@ function setSyncErr(msg) {
 
 function setSyncBusy(on) {
   syncBusy = on;
-  ['#sync-create', '#sync-connect', '#sync-now', '#sync-load'].forEach((sel) => {
+  ['#sync-create', '#sync-connect', '#sync-now', '#sync-load', '#sync-check', '#sync-push', '#sync-pull'].forEach((sel) => {
     const b = $(sel);
     if (b) b.disabled = on;
   });
@@ -2109,13 +2204,26 @@ function renderSyncBadge(mode) {
 function openSync() {
   const head = '<p class="eyebrow">Синхронизация</p><h2 id="modal-title">Общая библиотека</h2>';
   if (syncReady()) {
+    const localSummary = S.pantry.length + ' ' + plural(S.pantry.length, 'продукт', 'продукта', 'продуктов') + ', ' + S.custom.length + ' ' + plural(S.custom.length, 'рецепт', 'рецепта', 'рецептов');
+    let remoteSummary = 'нет данных — нажмите «Проверить библиотеку»';
+    if (SYNC.remote) {
+      const rp = SYNC.remote.pantry < 0 ? 'нет данных о продуктах' : SYNC.remote.pantry + ' ' + plural(SYNC.remote.pantry, 'продукт', 'продукта', 'продуктов');
+      const rr = SYNC.remote.recipes + ' ' + plural(SYNC.remote.recipes, 'рецепт', 'рецепта', 'рецептов');
+      remoteSummary = rp + ', ' + rr;
+    }
     openModal(head +
       '<p class="muted small">Рецепты, продукты, план и избранное синхронизируются между устройствами с этим кодом. Если меняли на двух устройствах сразу, победит последнее сохранённое.</p>' +
       '<div class="stack">' +
       '<div><p class="field-note">Код библиотеки</p><p class="code">' + esc(SYNC.gistId) + '</p></div>' +
       '<p class="muted small">Последняя синхронизация: ' + (SYNC.lastSync ? esc(fmtTime(SYNC.lastSync)) : 'ещё не было') + '</p>' +
+      '<p class="muted small">Это устройство: ' + localSummary + '.</p>' +
+      '<p class="muted small">В библиотеке: ' + remoteSummary + '</p>' +
+      '<p class="err" id="sync-err" hidden></p>' +
       '<div class="sync-actions">' +
       '<button class="btn primary" type="button" id="sync-now">Синхронизировать</button>' +
+      '<button class="btn ghost" type="button" id="sync-check">Проверить библиотеку</button>' +
+      '<button class="btn ghost" type="button" id="sync-push">Отправить наверх</button>' +
+      '<button class="btn ghost" type="button" id="sync-pull">Взять из библиотеки</button>' +
       '<button class="btn ghost" type="button" id="sync-copy">Скопировать код</button>' +
       '<button class="btn ghost" type="button" id="sync-save">Скачать настройки</button>' +
       '<button class="btn ghost danger" type="button" id="sync-off">Отключить</button>' +
@@ -2279,6 +2387,9 @@ function bindEvents() {
     if (e.target.id === 'sync-connect') { connectLibrary(); return; }
     if (e.target.id === 'sync-now') { syncNow(); return; }
     if (e.target.id === 'sync-copy') { copyText(SYNC.gistId); return; }
+    if (e.target.id === 'sync-check') { checkLibrary(); return; }
+    if (e.target.id === 'sync-push') { syncPush(); return; }
+    if (e.target.id === 'sync-pull') { syncPull(); return; }
     if (e.target.id === 'sync-save') { exportSyncFile(); return; }
     if (e.target.id === 'sync-off') { disconnectLibrary(); return; }
     if (e.target.id === 'imp-go') doImport($('#imp-text').value);
