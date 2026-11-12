@@ -1866,6 +1866,27 @@ async function createLibrary() {
   }
 }
 
+async function applySyncConfig(token, code) {
+  const prev = { token: SYNC.token, gistId: SYNC.gistId, lastSync: SYNC.lastSync, configured: SYNC.configured };
+  try {
+    const gist = await gh('/gists/' + code, { method: 'GET' }, token);
+    const remote = await readGistPayload(gist);
+    const merged = mergeLib(libPayload(), remote);
+    await gh('/gists/' + code, {
+      method: 'PATCH',
+      body: JSON.stringify({ files: { [GIST_FILE]: { content: JSON.stringify(merged, null, 2) } } })
+    }, token);
+    SYNC = { token, gistId: code, lastSync: Date.now(), configured: true };
+    saveSync();
+    applyLib(merged);
+    syncError = false;
+  } catch (e) {
+    SYNC = prev;
+    saveSync();
+    throw e;
+  }
+}
+
 async function connectLibrary() {
   if (syncBusy) return;
   const token = ($('#sync-token') ? $('#sync-token').value : '').trim();
@@ -1875,30 +1896,42 @@ async function connectLibrary() {
   setSyncErr('');
   setSyncBusy(true);
   try {
-    const gist = await gh('/gists/' + code, { method: 'GET' }, token);
-    const remote = await readGistPayload(gist);
-    SYNC = { token, gistId: code, lastSync: 0 };
-    saveSync();
-    const merged = mergeLib(libPayload(), remote);
-    applyLib(merged);
-    await gh('/gists/' + code, {
-      method: 'PATCH',
-      body: JSON.stringify({ files: { [GIST_FILE]: { content: JSON.stringify(merged, null, 2) } } })
-    }, token);
-    SYNC.lastSync = Date.now();
-    saveSync();
-    syncError = false;
+    await applySyncConfig(token, code);
     openSync();
     renderSyncBadge();
     renderRecipes();
     toast('Библиотека подключена');
   } catch (e) {
-    SYNC = { token: '', gistId: '', lastSync: 0 };
-    saveSync();
     setSyncErr(e.message);
   } finally {
     setSyncBusy(false);
   }
+}
+
+function importSyncFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async () => {
+    try {
+      const data = JSON.parse(String(reader.result || '').replace(/^\uFEFF/, ''));
+      const token = String(data.token || '').trim();
+      const code = extractGistId(data.gistId || data.code || '');
+      if (!token || !code) { setSyncErr('В файле нет токена или кода библиотеки.'); return; }
+      setSyncErr('');
+      setSyncBusy(true);
+      await applySyncConfig(token, code);
+      closeModal();
+      renderSyncBadge();
+      renderRecipes();
+      toast('Настройки загружены — библиотека подключена');
+    } catch (e) {
+      setSyncErr(e && e.message ? e.message : 'Не удалось прочитать файл.');
+    } finally {
+      setSyncBusy(false);
+    }
+  };
+  reader.onerror = () => setSyncErr('Не получилось прочитать файл.');
+  reader.readAsText(file, 'utf-8');
 }
 
 function disconnectLibrary() {
@@ -1908,6 +1941,12 @@ function disconnectLibrary() {
   closeModal();
   renderSyncBadge();
   toast('Синхронизация отключена');
+}
+
+function exportSyncFile() {
+  if (!SYNC.token || !SYNC.gistId) { toast('Сначала подключите библиотеку'); return; }
+  const data = { app: 'polka', v: 1, token: SYNC.token, gistId: SYNC.gistId };
+  downloadFile(JSON.stringify(data, null, 2), 'polka-sync.json');
 }
 
 function fmtTime(ts) {
@@ -1927,7 +1966,7 @@ function setSyncErr(msg) {
 
 function setSyncBusy(on) {
   syncBusy = on;
-  ['#sync-create', '#sync-connect', '#sync-now'].forEach((sel) => {
+  ['#sync-create', '#sync-connect', '#sync-now', '#sync-load'].forEach((sel) => {
     const b = $(sel);
     if (b) b.disabled = on;
   });
@@ -1956,10 +1995,11 @@ function openSync() {
       '<div class="sync-actions">' +
       '<button class="btn primary" type="button" id="sync-now">Синхронизировать</button>' +
       '<button class="btn ghost" type="button" id="sync-copy">Скопировать код</button>' +
+      '<button class="btn ghost" type="button" id="sync-save">Скачать настройки</button>' +
       '<button class="btn ghost danger" type="button" id="sync-off">Отключить</button>' +
       '<button class="btn ghost" type="button" data-close>Закрыть</button>' +
       '</div>' +
-      '<p class="note">Токен хранится только в этом браузере. На втором устройстве введите тот же токен и код. Секретный гист доступен любому, у кого есть код.</p>' +
+      '<p class="note">Токен хранится только в этом браузере. На новом устройстве нажмите «Загрузить настройки» и выберите файл polka-sync.json — токен и код подставятся сами. Секретный гист доступен любому, у кого есть код.</p>' +
       '</div>');
     return;
   }
@@ -1973,6 +2013,10 @@ function openSync() {
     '<div class="stack-sep">или подключиться к существующей</div>' +
     '<div class="field"><label for="sync-code">Код библиотеки</label><input id="sync-code" placeholder="ID гиста или ссылка" autocomplete="off"></div>' +
     '<div class="row-inline"><button class="btn" type="button" id="sync-connect">Подключиться</button></div>' +
+    '<div class="stack-sep">или перенести с другого устройства</div>' +
+    '<div class="row-inline"><button class="btn" type="button" id="sync-load">Загрузить настройки</button>' +
+    '<input class="file-input" type="file" id="sync-file" accept=".json,application/json" hidden></div>' +
+    '<p class="hint">Выберите polka-sync.json, скачанный на старом устройстве: токен и код подставятся сами.</p>' +
     '<p class="err" id="sync-err" hidden></p>' +
     '<p class="note">Токен хранится в localStorage браузера и не попадает в экспорт рецептов. Он даёт доступ к вашим гистам — при утере отзовите его на GitHub.</p>' +
     '</div>');
@@ -2109,10 +2153,13 @@ function bindEvents() {
     if (e.target.id === 'sync-connect') { connectLibrary(); return; }
     if (e.target.id === 'sync-now') { syncNow(); return; }
     if (e.target.id === 'sync-copy') { copyText(SYNC.gistId); return; }
+    if (e.target.id === 'sync-save') { exportSyncFile(); return; }
+    if (e.target.id === 'sync-load') { const f = $('#sync-file'); if (f) f.click(); return; }
     if (e.target.id === 'sync-off') { disconnectLibrary(); return; }
     if (e.target.id === 'imp-go') doImport($('#imp-text').value);
   });
   $('#modal-body').addEventListener('change', (e) => {
+    if (e.target.id === 'sync-file' && e.target.files && e.target.files[0]) { importSyncFile(e.target.files[0]); return; }
     if (e.target.id === 'imp-file' && e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       const reader = new FileReader();
