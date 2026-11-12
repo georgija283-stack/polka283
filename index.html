@@ -206,6 +206,7 @@ input:focus, select:focus, textarea:focus{outline:none;border-color:var(--leaf);
 .kid-menu h4{margin:0 0 4px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#7d8f80;font-weight:650}
 
 .file-input{font-size:13px;color:var(--ink-2)}
+.file-pick{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
 .row-inline{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .stack{display:grid;gap:13px;margin-top:15px}
 
@@ -249,38 +250,89 @@ textarea{resize:vertical;min-height:96px;line-height:1.45}
 :focus-visible{outline:2px solid var(--leaf);outline-offset:2px}
 .tab:focus-visible,.chip:focus-visible,.cook:focus-visible{outline-offset:2px}
 
-@media (max-width:1000px){
+/* ПК: широкие карточки и боковая колонка */
+@media (min-width:1200px){
+  .wrap{width:min(1280px,100% - 48px)}
+  .plan-wrap{grid-template-columns:minmax(0,1fr) 300px}
+  .plan-grid{grid-template-columns:repeat(auto-fill,minmax(270px,1fr))}
+  .rec-grid{grid-template-columns:repeat(auto-fill,minmax(252px,1fr))}
+}
+/* Планшет: две колонки, докупка под планом */
+@media (min-width:768px) and (max-width:1199px){
+  .wrap{width:calc(100% - 40px)}
   .plan-wrap{grid-template-columns:1fr}
-  .side{position:static;grid-template-columns:1fr 1fr}
+  .side{position:static;grid-template-columns:1fr 1fr;align-items:start}
+  .plan-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .rec-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .page-head{gap:16px}
 }
-@media (max-width:860px){
-  .add-form{grid-template-columns:minmax(0,1fr) 96px 108px;align-items:end}
-  .add-form .w-days{grid-column:1/3}
-  .add-form #add-prod{grid-column:3/4}
-  .add-form .w-days{grid-row:2}
-  .add-form #add-prod{grid-row:2}
+@media (min-width:768px) and (max-width:1023px){
+  .plan-settings{grid-template-columns:150px minmax(0,1fr) 130px;gap:14px 16px}
 }
-@media (max-width:760px){
-  .wrap{width:calc(100% - 28px)}
-  .topbar .wrap{height:auto;flex-wrap:wrap;padding:10px 0 11px;gap:10px}
-  .brand{font-size:21px}
-  .tabs{margin-left:0;width:100%;overflow:auto;justify-content:space-between}
-  .tab{padding:7px 12px;font-size:13px;flex:1;white-space:nowrap}
-  main{padding-top:22px}
-  .page-head{align-items:flex-start}
-  .plan-settings{grid-template-columns:1fr;gap:14px}
-  .plan-settings fieldset:last-of-type{grid-column:auto}
-  .modal-card{padding:22px 18px}
+/* Планшет и уже: форма добавления в две строки */
+@media (max-width:1023px){
+  .add-form{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;align-items:end}
+  .add-form .grow{grid-column:1/-1}
+  .add-form #add-prod{grid-column:1/-1;height:44px}
   .modal-grid{grid-template-columns:1fr;gap:20px}
-  h1{font-size:27px}
-  .side{grid-template-columns:1fr}
-  .counters{gap:20px}
-  .add-form{grid-template-columns:minmax(0,1fr) 84px 96px;gap:10px}
-  .add-form .w-days{grid-column:1/2;grid-row:2}
-  .add-form #add-prod{grid-column:2/4;grid-row:2}
-  .prod-row{gap:8px}
-  .prod-name{flex:1 1 100%}
-  .prod-name input{padding-left:0}
+}
+/* Телефон: нижняя навигация и одна колонка */
+@media (max-width:767px){
+  body{padding-bottom:calc(64px + env(safe-area-inset-bottom))}
+  .wrap{width:calc(100% - 24px)}
+  .topbar .wrap{height:58px;gap:10px}
+  .brand{font-size:22px}
+  .tabs{position:fixed;left:0;right:0;bottom:0;z-index:50;margin:0;width:100%;padding:6px 8px calc(6px + env(safe-area-inset-bottom));border-radius:0;background:#12241b;box-shadow:0 -1px 0 rgba(255,255,255,.08);display:flex;gap:4px}
+  .tab{flex:1;padding:11px 4px;font-size:12.5px;border-radius:10px;text-align:center}
+  main{padding:18px 0 26px;min-height:0}
+  h1{font-size:24px}
+  .lede{font-size:14px}
+  .page-head{margin-bottom:16px;gap:12px;align-items:flex-start}
+  .counters{gap:18px}
+  .kpi b{font-size:23px}
+  .add-form{grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;padding:13px}
+  .add-form .grow{grid-column:1/-1}
+  .add-form #add-prod{grid-column:1/-1;height:44px;font-size:15px}
+  input[type="text"],input[type="number"],input[type="search"],select,textarea{font-size:16px;padding:11px 12px}
+  .btn{min-height:42px;padding:11px 16px}
+  .btn.small{min-height:34px;padding:7px 12px}
+  .chk{min-height:38px}
+  .chk input{width:18px;height:18px}
+  .prod-row{display:grid;grid-template-columns:9px minmax(0,1fr) auto auto 34px;grid-template-areas:"dot name name name del" "dot qty shelf badge del";gap:8px;align-items:center;padding:10px 10px 10px 12px}
+  .prod-row .dot{grid-area:dot}
+  .prod-row .prod-name{grid-area:name}
+  .prod-row .prod-name input{padding-left:0;font-size:16px}
+  .prod-row .qty-wrap{grid-area:qty;justify-self:start}
+  .prod-row .shelf{grid-area:shelf;justify-self:start}
+  .prod-row .shelf input{width:52px}
+  .prod-row .badge{grid-area:badge;justify-self:end}
+  .prod-row .icon-btn{grid-area:del;justify-self:end;width:34px;height:34px}
+  .plan-settings{grid-template-columns:1fr;gap:13px;padding:14px}
+  .plan-settings .wide-field{grid-column:auto}
+  .step{width:40px;height:40px}
+  .stepper input{width:64px}
+  .plan-bar{flex-wrap:wrap;gap:8px}
+  .plan-wrap{grid-template-columns:1fr;gap:14px}
+  .plan-grid{grid-template-columns:1fr;gap:12px}
+  .side{position:static;grid-template-columns:1fr;gap:12px}
+  .rec-grid{grid-template-columns:1fr}
+  #rec-search{max-width:none}
+  .chips{gap:6px}
+  .chip{padding:8px 12px}
+  .cook{width:40px;height:40px}
+  .modal{padding:0}
+  .modal-card{width:100%;height:100vh;height:100dvh;max-height:100dvh;border-radius:0;padding:20px 16px 26px}
+  .modal h2{font-size:22px}
+  .modal-grid{gap:18px;margin-top:16px}
+  .modal-actions{position:sticky;bottom:0;background:var(--card);padding-bottom:4px}
+  .toast{bottom:calc(72px + env(safe-area-inset-bottom))}
+  .foot{margin-top:26px}
+}
+@media (max-width:379px){
+  .tab{font-size:11.5px}
+  h1{font-size:22px}
+  .counters{gap:14px}
+  .kpi b{font-size:21px}
 }
 @media (prefers-reduced-motion: reduce){
   *, *::before, *::after{animation-duration:.001ms !important;transition-duration:.001ms !important}
@@ -2014,9 +2066,9 @@ function openSync() {
     '<div class="field"><label for="sync-code">Код библиотеки</label><input id="sync-code" placeholder="ID гиста или ссылка" autocomplete="off"></div>' +
     '<div class="row-inline"><button class="btn" type="button" id="sync-connect">Подключиться</button></div>' +
     '<div class="stack-sep">или перенести с другого устройства</div>' +
-    '<div class="row-inline"><button class="btn" type="button" id="sync-load">Загрузить настройки</button>' +
-    '<input class="file-input" type="file" id="sync-file" accept=".json,application/json" hidden></div>' +
-    '<p class="hint">Выберите polka-sync.json, скачанный на старом устройстве: токен и код подставятся сами.</p>' +
+    '<div class="row-inline"><label class="btn" for="sync-file" id="sync-load">Загрузить настройки</label>' +
+    '<input class="file-pick" type="file" id="sync-file"></div>' +
+    '<p class="hint">Выберите polka-sync.json, скачанный на старом устройстве: токен и код подставятся сами. Если телефон не показывает JSON, переключите фильтр на «Все файлы».</p>' +
     '<p class="err" id="sync-err" hidden></p>' +
     '<p class="note">Токен хранится в localStorage браузера и не попадает в экспорт рецептов. Он даёт доступ к вашим гистам — при утере отзовите его на GitHub.</p>' +
     '</div>');
@@ -2154,7 +2206,6 @@ function bindEvents() {
     if (e.target.id === 'sync-now') { syncNow(); return; }
     if (e.target.id === 'sync-copy') { copyText(SYNC.gistId); return; }
     if (e.target.id === 'sync-save') { exportSyncFile(); return; }
-    if (e.target.id === 'sync-load') { const f = $('#sync-file'); if (f) f.click(); return; }
     if (e.target.id === 'sync-off') { disconnectLibrary(); return; }
     if (e.target.id === 'imp-go') doImport($('#imp-text').value);
   });
