@@ -1,0 +1,2151 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Полка — продукты и план питания</title>
+<meta name="description" content="Учёт продуктов в холодильнике, автоматический план питания по дням и библиотека рецептов. Работает офлайн в браузере.">
+<style>
+:root{
+  --bg:#eef1ea;
+  --card:#fffefa;
+  --ink:#16201a;
+  --ink-2:#5c685f;
+  --line:#d9dfd2;
+  --leaf:#2d6a4f;
+  --leaf-ink:#1b4332;
+  --leaf-soft:#dceade;
+  --sun:#b97812;
+  --sun-soft:#f7e9cb;
+  --clay:#a8472f;
+  --clay-soft:#f7e0d9;
+  --shadow:0 1px 2px rgba(22,32,26,.05), 0 14px 30px -24px rgba(22,32,26,.55);
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+html,body{margin:0}
+body{
+  background:
+    radial-gradient(1200px 500px at 78% -180px, #e2ebdd 0%, rgba(226,235,221,0) 70%),
+    var(--bg);
+  color:var(--ink);
+  font:16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4{margin:0;line-height:1.2;letter-spacing:-.015em}
+p{margin:0}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:var(--leaf)}
+
+.wrap{width:min(1180px, 100% - 40px);margin-inline:auto}
+
+.topbar{position:sticky;top:0;z-index:40;background:#12241b;color:#eef3ea;border-bottom:1px solid #0a1a11}
+.topbar .wrap{display:flex;align-items:center;gap:20px;height:64px}
+.brand{display:flex;align-items:center;gap:9px;font-family:Georgia, "Iowan Old Style", "Times New Roman", serif;font-size:24px;letter-spacing:-.01em;color:#f2f0e4;user-select:none}
+.brand svg{flex:none}
+.tabs{display:flex;gap:3px;margin-left:auto;padding:4px;background:rgba(255,255,255,.07);border-radius:999px}
+.tab{appearance:none;border:0;background:transparent;color:#cfdbd0;padding:7px 15px;border-radius:999px;font-size:14px;transition:background .15s,color .15s}
+.tab:hover{background:rgba(255,255,255,.08);color:#fff}
+.tab[aria-selected="true"]{background:#f2f0e4;color:#16201a;font-weight:600}
+
+main{padding:34px 0 30px;min-height:calc(100vh - 64px)}
+.view{animation:none}
+
+.page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap;margin-bottom:22px}
+h1{font-size:clamp(28px,3.4vw,38px);font-weight:700;letter-spacing:-.025em}
+.lede{margin-top:7px;color:var(--ink-2);max-width:56ch}
+.counters{display:flex;gap:26px}
+.kpi{display:flex;flex-direction:column;line-height:1.1}
+.kpi b{font-size:26px;font-weight:650;font-variant-numeric:tabular-nums}
+.kpi span{font-size:12px;color:var(--ink-2);margin-top:3px}
+.kpi.warn b{color:var(--sun)}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:var(--shadow)}
+.card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.card-head h2{font-size:15px;font-weight:650}
+.link{background:none;border:0;color:var(--leaf);font-size:13px;padding:2px 0;text-decoration:underline;text-underline-offset:3px}
+.link:hover{color:var(--leaf-ink)}
+.muted{color:var(--ink-2)}
+.small{font-size:12.5px}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:10px 16px;border-radius:10px;font-size:14px;font-weight:550;transition:background .15s,border-color .15s,transform .1s}
+.btn:hover{border-color:#bcc7b7;background:#faf8f0}
+.btn:active{transform:translateY(1px)}
+.btn.primary{background:var(--leaf);border-color:var(--leaf);color:#f7fbf6}
+.btn.primary:hover{background:var(--leaf-ink);border-color:var(--leaf-ink)}
+.btn.ghost{background:transparent}
+.btn.small{padding:7px 12px;font-size:13px}
+.btn.danger{color:var(--clay);border-color:#e3c6bd}
+.btn.wide{width:100%}
+.head-actions{display:flex;gap:8px;flex-wrap:wrap}
+
+.field{display:flex;flex-direction:column;gap:5px;min-width:0}
+.field label, .field legend, .field > span{font-size:12px;color:var(--ink-2);letter-spacing:.01em}
+fieldset.field{border:0;padding:0;margin:0}
+input[type="text"], input[type="number"], input[type="search"], select, textarea{
+  width:100%;background:#fff;border:1px solid var(--line);border-radius:9px;padding:9px 11px;font-size:14px;
+  transition:border-color .15s, box-shadow .15s;
+}
+input:focus, select:focus, textarea:focus{outline:none;border-color:var(--leaf);box-shadow:0 0 0 3px rgba(45,106,79,.14)}
+::placeholder{color:#9aa79c}
+
+.add-form{display:grid;grid-template-columns:minmax(180px,2.4fr) 110px 130px 120px auto;gap:12px;align-items:end;margin-bottom:6px;padding:16px}
+.add-form .grow{min-width:0}
+.add-form #add-prod{height:38px;white-space:nowrap}
+
+.pantry-groups{margin-top:18px;display:grid;gap:22px}
+.group-head{display:flex;align-items:center;gap:10px;margin-bottom:9px;font-size:13px;font-weight:600;color:var(--ink-2)}
+.group-head .line{flex:1;height:1px;background:var(--line)}
+.group-head .cnt{font-weight:400;color:#8a978d}
+
+.prod-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 12px 9px 14px;background:var(--card);border:1px solid var(--line);border-radius:12px;margin-bottom:7px;transition:border-color .15s}
+.prod-row:hover{border-color:#c6d0c0}
+.dot{width:9px;height:9px;border-radius:50%;flex:none;background:#b9c4b6}
+.dot[data-cat="meat"]{background:#c06a52}
+.dot[data-cat="dairy"]{background:#d3a93c}
+.dot[data-cat="veg"]{background:#4f8d63}
+.dot[data-cat="grain"]{background:#a8895f}
+.dot[data-cat="grocery"]{background:#8d7fa8}
+.prod-name{flex:1 1 170px;min-width:0}
+.prod-name input{border:1px solid transparent;background:transparent;padding:4px 5px;font-weight:550;border-radius:7px;width:100%}
+.prod-name input:hover{border-color:var(--line)}
+.qty-wrap{display:flex;align-items:center;gap:5px}
+.prod-row .prod-qty{width:66px;padding:5px 7px;font-size:13.5px;text-align:right;font-variant-numeric:tabular-nums}
+.prod-unit{font-size:13px;color:var(--ink-2);min-width:22px}
+.shelf{display:flex;align-items:center;gap:6px}
+.prod-row .shelf input{width:48px;padding:5px 6px;font-size:13.5px;text-align:center}
+.shelf .cap{font-size:12px;color:#8a978d}
+.badge{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;padding:3px 8px;border-radius:999px;background:#eef1ea;color:var(--ink-2);white-space:nowrap;font-variant-numeric:tabular-nums}
+.badge.warn{background:var(--sun-soft);color:#8a5a06}
+.badge.hot{background:var(--clay-soft);color:var(--clay)}
+.badge.fine{background:var(--leaf-soft);color:var(--leaf-ink)}
+.icon-btn{flex:none;width:28px;height:28px;border-radius:8px;border:1px solid transparent;background:transparent;color:#8a978d;font-size:18px;line-height:1;display:grid;place-items:center}
+.icon-btn:hover{background:var(--clay-soft);color:var(--clay);border-color:#eed3ca}
+
+.empty{padding:36px 20px;text-align:center;border:1px dashed #cbd4c4;border-radius:16px;background:rgba(255,255,255,.45)}
+.empty h3{font-size:17px;margin-bottom:6px}
+.empty p{color:var(--ink-2);max-width:44ch;margin:0 auto 14px}
+.plan-settings{display:grid;grid-template-columns:170px minmax(0,1.3fr) 150px;gap:16px 22px;align-items:end;margin-bottom:20px}
+.plan-settings .wide{grid-column:1/-1}
+.plan-settings .wide-field{grid-column:1/-1}
+.plan-settings .kid-portions{display:flex;align-items:center;gap:9px;margin-top:10px;font-size:13.5px;color:var(--ink-2)}
+.plan-settings .kid-portions select{width:auto;padding:6px 10px}
+.plan-settings .kid-portions[hidden]{display:none}
+.stepper{display:flex;align-items:center;gap:6px}
+.stepper input{width:58px;text-align:center;padding:8px 4px;font-variant-numeric:tabular-nums}
+.step{width:34px;height:34px;flex:none;border:1px solid var(--line);background:#fff;border-radius:9px;font-size:17px;line-height:1;display:grid;place-items:center;color:var(--ink-2)}
+.step:hover{border-color:#bcc7b7;color:var(--ink)}
+.chk-row{display:flex;flex-wrap:wrap;gap:8px 18px;padding-top:3px}
+.chk{display:inline-flex;align-items:center;gap:7px;font-size:14px;color:var(--ink);cursor:pointer}
+.chk input{width:16px;height:16px;accent-color:var(--leaf);margin:0}
+
+.plan-bar{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:4px 0 14px}
+.status{font-size:13.5px;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.status.on{color:var(--ink)}
+
+.plan-wrap{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:20px;align-items:start}
+.plan-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(305px,1fr));gap:14px}
+.plan-grid .empty{grid-column:1/-1}
+.day-card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 16px 6px;box-shadow:var(--shadow)}
+.day-head{display:flex;align-items:baseline;gap:11px;margin-bottom:4px}
+.day-num{font-family:Georgia, "Iowan Old Style", serif;font-size:29px;line-height:1;color:var(--leaf)}
+.day-head h3{font-size:14px;font-weight:650}
+.day-date{font-size:12px;color:var(--ink-2);margin-left:auto}
+.meals{list-style:none;margin:0;padding:0}
+.meal-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 10px;align-items:center;padding:10px 0 11px;border-top:1px solid var(--line)}
+.meal-label{grid-column:1/-1;font-size:11px;color:#8a978d;letter-spacing:.02em}
+.meal-main{min-width:0;display:flex;flex-direction:column;gap:2px}
+.meal-title{background:none;border:0;padding:0;text-align:left;font-size:14.5px;font-weight:600;line-height:1.3;color:var(--ink)}
+.meal-title:hover{color:var(--leaf);text-decoration:underline;text-underline-offset:3px}
+.meal-meta{font-size:11.5px;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.meal-meta .ok{color:var(--leaf)}
+.meal-meta .miss{color:var(--clay)}
+.cook{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:#fff;color:#8a978d;display:grid;place-items:center;transition:background .15s,color .15s,border-color .15s}
+.cook svg{width:17px;height:17px}
+.cook:hover{border-color:var(--leaf);color:var(--leaf)}
+.cook.done{background:var(--leaf-soft);border-color:#b8d6c0;color:var(--leaf-ink);cursor:default}
+.cook:disabled{opacity:1}
+
+.side{position:sticky;top:84px;display:grid;gap:14px}
+.shop-list,.soon-list{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.shop-item{display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px dashed #e4e8dc;font-size:14px}
+.shop-item:last-child{border-bottom:0}
+.shop-item .nm{flex:1;min-width:0}
+.shop-item .qt{font-size:13px;color:var(--ink-2);font-variant-numeric:tabular-nums;white-space:nowrap}
+.shop-item input{width:15px;height:15px;accent-color:var(--leaf);margin:0;flex:none}
+.shop-item.done .nm{text-decoration:line-through;color:#9aa79c}
+.soon-item{display:flex;align-items:center;gap:9px;padding:6px 0;font-size:13.5px}
+.soon-item .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.rec-toolbar{display:flex;flex-direction:column;gap:12px;margin-bottom:18px}
+#rec-search{max-width:420px;padding:10px 13px;border-radius:11px}
+.chips{display:flex;gap:7px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--card);color:var(--ink-2);padding:6px 13px;border-radius:999px;font-size:13px}
+.chip:hover{border-color:#bcc7b7;color:var(--ink)}
+.chip.is-on{background:var(--leaf);border-color:var(--leaf);color:#f7fbf6}
+
+.rec-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(268px,1fr));gap:13px}
+.rec-card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:15px 16px;display:flex;flex-direction:column;gap:9px;cursor:pointer;transition:transform .16s,border-color .16s,box-shadow .16s;outline-offset:3px}
+.rec-card:hover{transform:translateY(-2px);border-color:#c0cbb9;box-shadow:0 16px 30px -26px rgba(22,32,26,.8)}
+.rec-card:active{transform:none}
+.rec-top{display:flex;align-items:flex-start;gap:8px}
+.rec-top h3{font-size:16px;font-weight:650;line-height:1.3;flex:1}
+.rec-fav{flex:none;color:var(--sun);font-size:14px;line-height:1.4}
+.rec-meta{font-size:12.5px;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.rec-ing{font-size:12.5px;color:#7d8a80;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cov{margin-top:auto;display:flex;flex-direction:column;gap:5px}
+.cov-bar{height:5px;border-radius:99px;background:#e8ece0;overflow:hidden}
+.cov-bar i{display:block;height:100%;background:var(--leaf);border-radius:99px}
+.cov-txt{font-size:11.5px;color:var(--ink-2);display:flex;justify-content:space-between;gap:8px}
+.cov-txt b{font-weight:600;color:var(--ink)}
+.tagline{display:flex;gap:5px;flex-wrap:wrap}
+.tag{font-size:11px;color:#5c685f;background:#eef1ea;border-radius:6px;padding:2px 7px}
+.tag.kid{background:#e7f0e2;color:#3f6b45}
+.kid-menu{margin-top:12px;padding-top:10px;border-top:1px dashed var(--line)}
+.kid-menu h4{margin:0 0 4px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#7d8f80;font-weight:650}
+
+.file-input{font-size:13px;color:var(--ink-2)}
+.row-inline{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.stack{display:grid;gap:13px;margin-top:15px}
+
+.foot{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:#8a978d;font-size:12px}
+
+.modal{position:fixed;inset:0;z-index:60;background:rgba(9,20,14,.52);display:grid;place-items:center;padding:22px;overflow:auto;animation:fade .15s ease both}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.modal-card{position:relative;background:var(--card);border-radius:18px;width:min(780px,100%);max-height:calc(100vh - 44px);overflow:auto;padding:26px 28px;box-shadow:0 40px 80px -30px rgba(0,0,0,.5);animation:pop .18s ease both}
+@keyframes pop{from{opacity:0;transform:translateY(10px) scale(.99)}to{opacity:1;transform:none}}
+.modal-x{position:absolute;top:12px;right:12px;width:32px;height:32px;border-radius:9px;border:0;background:#f0f2ea;color:#6f7c72;font-size:20px;line-height:1;display:grid;place-items:center}
+.modal-x:hover{background:var(--clay-soft);color:var(--clay)}
+.modal h2{font-size:25px;margin:4px 34px 6px 0}
+.eyebrow{font-size:12px;color:var(--leaf);font-weight:600;letter-spacing:.02em}
+.modal-grid{display:grid;grid-template-columns:1fr 1.12fr;gap:26px;margin-top:20px}
+.modal h3{font-size:13px;text-transform:none;color:var(--ink-2);font-weight:650;margin-bottom:9px}
+.ing-list{list-style:none;margin:0;padding:0;display:grid;gap:1px}
+.ing-item{display:flex;align-items:baseline;gap:8px;padding:6px 0;border-bottom:1px dashed #e4e8dc;font-size:14px}
+.ing-item:last-child{border-bottom:0}
+.ing-item .nm{flex:1;min-width:0}
+.ing-item .qt{color:var(--ink-2);font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ing-item .st{font-size:10.5px;padding:2px 6px;border-radius:5px;white-space:nowrap}
+.st.ok{background:var(--leaf-soft);color:var(--leaf-ink)}
+.st.part{background:var(--sun-soft);color:#8a5a06}
+.st.no{background:var(--clay-soft);color:var(--clay)}
+.st.base{background:#eef1ea;color:#8a978d}
+.steps{margin:0;padding-left:20px;display:grid;gap:9px;font-size:14.5px;line-height:1.5}
+.steps li{padding-left:2px}
+.steps li::marker{color:var(--leaf);font-weight:600}
+.modal-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:22px;padding-top:16px;border-top:1px solid var(--line)}
+.recipe-form{display:grid;gap:14px;margin-top:6px}
+.form-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px}
+.form-row .chk{font-size:13.5px}
+textarea{resize:vertical;min-height:96px;line-height:1.45}
+.hint{font-size:12px;color:#8a978d}
+.err{color:var(--clay);font-size:13px}
+.modal .note{background:#f4f6ee;border-radius:10px;padding:10px 12px;font-size:12.5px;color:var(--ink-2)}
+
+.toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,14px);z-index:80;background:#14251c;color:#f2f5ee;padding:10px 18px;border-radius:999px;font-size:13.5px;opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;max-width:calc(100vw - 40px);text-align:center}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+:focus-visible{outline:2px solid var(--leaf);outline-offset:2px}
+.tab:focus-visible,.chip:focus-visible,.cook:focus-visible{outline-offset:2px}
+
+@media (max-width:1000px){
+  .plan-wrap{grid-template-columns:1fr}
+  .side{position:static;grid-template-columns:1fr 1fr}
+}
+@media (max-width:860px){
+  .add-form{grid-template-columns:minmax(0,1fr) 96px 108px;align-items:end}
+  .add-form .w-days{grid-column:1/3}
+  .add-form #add-prod{grid-column:3/4}
+  .add-form .w-days{grid-row:2}
+  .add-form #add-prod{grid-row:2}
+}
+@media (max-width:760px){
+  .wrap{width:calc(100% - 28px)}
+  .topbar .wrap{height:auto;flex-wrap:wrap;padding:10px 0 11px;gap:10px}
+  .brand{font-size:21px}
+  .tabs{margin-left:0;width:100%;overflow:auto;justify-content:space-between}
+  .tab{padding:7px 12px;font-size:13px;flex:1;white-space:nowrap}
+  main{padding-top:22px}
+  .page-head{align-items:flex-start}
+  .plan-settings{grid-template-columns:1fr;gap:14px}
+  .plan-settings fieldset:last-of-type{grid-column:auto}
+  .modal-card{padding:22px 18px}
+  .modal-grid{grid-template-columns:1fr;gap:20px}
+  h1{font-size:27px}
+  .side{grid-template-columns:1fr}
+  .counters{gap:20px}
+  .add-form{grid-template-columns:minmax(0,1fr) 84px 96px;gap:10px}
+  .add-form .w-days{grid-column:1/2;grid-row:2}
+  .add-form #add-prod{grid-column:2/4;grid-row:2}
+  .prod-row{gap:8px}
+  .prod-name{flex:1 1 100%}
+  .prod-name input{padding-left:0}
+}
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{animation-duration:.001ms !important;transition-duration:.001ms !important}
+}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:#c3ccbe;flex:none;transition:background .15s}
+.sync-dot.on{background:#7db98e}
+.sync-dot.err{background:#e0a08c}
+.field-note{font-size:12px;color:var(--ink-2);margin-bottom:5px}
+.code{font-family:ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;font-size:12.5px;line-height:1.45;background:#f1f3ea;border:1px solid var(--line);border-radius:8px;padding:9px 11px;word-break:break-all;color:var(--ink)}
+.stack-sep{display:flex;align-items:center;gap:10px;color:#8a978d;font-size:12px;margin:2px 0}
+.stack-sep::before,.stack-sep::after{content:"";height:1px;background:var(--line);flex:1}
+.sync-actions{display:flex;gap:8px;flex-wrap:wrap}
+#sync-token,#sync-code{font-family:ui-monospace, SFMono-Regular, Consolas, monospace;font-size:13px}
+.hint a,.note a{color:var(--leaf)}
+
+/*CSS-END*/
+</style>
+<script>
+  (function () {
+    var s = document.createElement('script');
+    s.src = 'polka.local.js';
+    s.onload = function () {
+      if (typeof applyLocalToken !== 'function') return;
+      applyLocalToken();
+      if (typeof renderSyncBadge === 'function') renderSyncBadge();
+      if (document.readyState !== 'loading' && typeof syncReady === 'function' && syncReady() && typeof syncNow === 'function') {
+        syncNow({ silent: true });
+      }
+    };
+    s.onerror = function () {};
+    document.head.appendChild(s);
+  })();
+</script>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <div class="brand">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity=".5"/>
+        <circle cx="8" cy="6" r="2.1" fill="#d69426"/>
+        <circle cx="14" cy="12" r="2.1" fill="#7fb089"/>
+        <circle cx="10" cy="18" r="2.1" fill="#e8dfc6"/>
+      </svg>
+      <span>полка</span>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Разделы">
+      <button class="tab" role="tab" aria-selected="true" data-tab="pantry" type="button">Холодильник</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="plan" type="button">План питания</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="recipes" type="button">Рецепты</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="view" id="view-pantry" role="tabpanel" aria-label="Холодильник">
+    <div class="page-head">
+      <div>
+        <h1>Холодильник</h1>
+        <p class="lede">Внесите, что купили на несколько дней. План питания соберётся из этих продуктов.</p>
+      </div>
+      <div class="counters">
+        <div class="kpi"><b id="p-count">0</b><span>позиций</span></div>
+        <div class="kpi warn"><b id="p-soon">0</b><span>скоро истекают</span></div>
+      </div>
+    </div>
+
+    <form class="card add-form" id="add-form" autocomplete="off">
+      <div class="field grow">
+        <label for="prod-name">Продукт</label>
+        <input id="prod-name" list="ing-suggest" placeholder="куриная грудка" required>
+      </div>
+      <div class="field w-qty">
+        <label for="prod-qty">Количество</label>
+        <input id="prod-qty" type="number" min="0" step="any" value="1" required>
+      </div>
+      <div class="field w-unit">
+        <label for="prod-unit">Ед.</label>
+        <select id="prod-unit">
+          <option>г</option><option>кг</option><option>мл</option><option>л</option>
+          <option>шт</option><option>пучок</option><option>зуб.</option><option>ломоть</option>
+          <option>банка</option><option>упаковка</option><option>ст.л.</option><option>ч.л.</option>
+        </select>
+      </div>
+      <div class="field w-days">
+        <label for="prod-days">Срок, дней</label>
+        <input id="prod-days" type="number" min="0" max="90" placeholder="—">
+      </div>
+      <button class="btn primary" id="add-prod" type="submit">Добавить</button>
+    </form>
+    <datalist id="ing-suggest"></datalist>
+
+    <div class="pantry-groups" id="pantry-list"></div>
+  </section>
+
+  <section class="view" id="view-plan" role="tabpanel" aria-label="План питания" hidden>
+    <div class="page-head">
+      <div>
+        <h1>План питания</h1>
+        <p class="lede">Укажите, на сколько дней планируете, — соберём разные блюда и список докупки.</p>
+      </div>
+    </div>
+
+    <form class="card plan-settings" id="plan-form">
+      <div class="field">
+        <label for="days">На сколько дней</label>
+        <div class="stepper">
+          <button class="step" type="button" data-step="-1" aria-label="Меньше дней">−</button>
+          <input id="days" type="number" min="1" max="14" value="5">
+          <button class="step" type="button" data-step="1" aria-label="Больше дней">+</button>
+        </div>
+      </div>
+      <fieldset class="field">
+        <legend>Приёмы пищи</legend>
+        <div class="chk-row">
+          <label class="chk"><input type="checkbox" id="m-breakfast" checked> Завтрак</label>
+          <label class="chk"><input type="checkbox" id="m-lunch" checked> Обед</label>
+          <label class="chk"><input type="checkbox" id="m-dinner" checked> Ужин</label>
+          <label class="chk"><input type="checkbox" id="m-snack"> Перекус</label>
+        </div>
+      </fieldset>
+      <div class="field w-portions">
+        <label for="portions">Порций за приём</label>
+        <select id="portions">
+          <option value="1">1</option><option value="2" selected>2</option>
+          <option value="3">3</option><option value="4">4</option>
+          <option value="5">5</option><option value="6">6</option>
+          <option value="7">7</option><option value="8">8</option>
+          <option value="9">9</option><option value="10">10</option>
+          <option value="11">11</option><option value="12">12</option>
+        </select>
+      </div>
+      <fieldset class="field wide-field">
+        <legend>Условия</legend>
+        <div class="chk-row">
+          <label class="chk"><input type="checkbox" id="pref-veg"> Без мяса</label>
+          <label class="chk"><input type="checkbox" id="pref-fish"> Без рыбы</label>
+          <label class="chk"><input type="checkbox" id="pref-quick"> До 30 минут</label>
+        </div>
+      </fieldset>
+      <fieldset class="field wide-field">
+        <legend>Детское меню</legend>
+        <div class="chk-row">
+          <label class="chk"><input type="checkbox" id="pref-kid"> Отдельные блюда для ребёнка</label>
+        </div>
+        <div class="kid-portions" id="kid-portions-wrap" hidden>
+          <label for="kid-portions">Порций ребёнку</label>
+          <select id="kid-portions">
+            <option value="1" selected>1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+          </select>
+        </div>
+      </fieldset>
+      <button class="btn primary wide" id="gen-plan" type="submit">Собрать план</button>
+    </form>
+
+    <div class="plan-bar">
+      <p class="status" id="plan-status">План ещё не собран</p>
+      <button class="btn ghost small" id="regen" type="button">Пересобрать</button>
+    </div>
+
+    <div class="plan-wrap">
+      <div class="plan-grid" id="plan-grid"></div>
+      <aside class="side">
+        <section class="card">
+          <div class="card-head">
+            <h2>Докупить</h2>
+            <button class="link" id="copy-shop" type="button">Скопировать</button>
+          </div>
+          <ul class="shop-list" id="shop-list"></ul>
+          <p class="muted small" id="shop-empty">Появится после сборки плана.</p>
+        </section>
+        <section class="card">
+          <div class="card-head"><h2>Скоро испортится</h2></div>
+          <ul class="soon-list" id="soon-list"></ul>
+        </section>
+      </aside>
+    </div>
+  </section>
+
+  <section class="view" id="view-recipes" role="tabpanel" aria-label="Рецепты" hidden>
+    <div class="page-head">
+      <div>
+        <h1>Библиотека рецептов</h1>
+        <p class="lede"><span id="rec-count">0 рецептов</span> в базе. Покрытие считается по вашей полке.</p>
+      </div>
+      <div class="head-actions">
+        <button class="btn primary" id="add-recipe" type="button">Свой рецепт</button>
+        <button class="btn ghost" id="import-recipe" type="button">Импорт</button>
+        <button class="btn ghost" id="export-recipe" type="button">Скачать JSON</button>
+        <button class="btn ghost" id="sync-open" type="button" aria-haspopup="dialog" title="Общая библиотека на телефоне и планшете"><span class="sync-dot" id="sync-dot"></span><span id="sync-label">Общая библиотека</span></button>
+      </div>
+    </div>
+
+    <div class="rec-toolbar">
+      <input id="rec-search" type="search" placeholder="Найти рецепт или продукт" aria-label="Поиск рецептов">
+      <div class="chips" id="rec-filters">
+        <button class="chip is-on" data-filter="all" type="button">Все</button>
+        <button class="chip" data-filter="breakfast" type="button">Завтраки</button>
+        <button class="chip" data-filter="lunch" type="button">Обеды</button>
+        <button class="chip" data-filter="dinner" type="button">Ужины</button>
+        <button class="chip" data-filter="snack" type="button">Перекусы</button>
+        <button class="chip" data-filter="fav" type="button">Избранное</button>
+        <button class="chip" data-filter="mine" type="button">Мои</button>
+      </div>
+    </div>
+
+    <div class="rec-grid" id="rec-grid"></div>
+  </section>
+
+  <footer class="foot">
+    <span>Данные хранятся только в этом браузере. Экспортируйте рецепты в JSON, чтобы не потерять.</span>
+  </footer>
+</main>
+
+<div class="modal" id="modal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <button class="modal-x" id="modal-x" type="button" aria-label="Закрыть">×</button>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+"use strict";
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+const MEALS = [
+  { id: 'breakfast', label: 'Завтрак' },
+  { id: 'lunch', label: 'Обед' },
+  { id: 'dinner', label: 'Ужин' },
+  { id: 'snack', label: 'Перекус' }
+];
+const MEAL_LABEL = { breakfast: 'Завтрак', lunch: 'Обед', dinner: 'Ужин', snack: 'Перекус' };
+
+const UNITS = {
+  'г': { f: 1, fam: 'mass' }, 'кг': { f: 1000, fam: 'mass' },
+  'мл': { f: 1, fam: 'vol' }, 'л': { f: 1000, fam: 'vol' },
+  'шт': { f: 1, fam: 'count' }, 'пучок': { f: 1, fam: 'count' },
+  'зуб.': { f: 1, fam: 'count' }, 'ломоть': { f: 1, fam: 'count' },
+  'банка': { f: 1, fam: 'pack' }, 'упаковка': { f: 1, fam: 'pack' },
+  'ст.л.': { f: 1, fam: 'spoon' }, 'ч.л.': { f: 1, fam: 'spoon' },
+  'щепотка': { f: 1, fam: 'pinch' }
+};
+const unitFactor = (u) => (UNITS[u] || UNITS['шт']).f;
+const unitFam = (u) => (UNITS[u] || UNITS['шт']).fam;
+const baseQty = (q, u) => Number(q) * unitFactor(u);
+
+const BASICS = new Set(['соль', 'вода', 'сахар', 'перец чёрный']);
+
+const SYN = {
+  'куриная грудка': 'куриная грудка', 'грудка': 'куриная грудка', 'куриное филе': 'куриная грудка',
+  'филе куриное': 'куриная грудка', 'филе грудки': 'куриная грудка', 'грудка куриная': 'куриная грудка',
+  'куриные бёдра': 'куриные бёдра', 'куриные бедра': 'куриные бёдра', 'бедра куриные': 'куриные бёдра',
+  'бедро': 'куриные бёдра', 'куриные ножки': 'куриные бёдра', 'курица': 'курица', 'куриное мясо': 'курица',
+  'яйца': 'яйца', 'яйцо': 'яйца', 'яички': 'яйца',
+  'помидоры': 'помидоры', 'помидор': 'помидоры', 'томаты': 'помидоры', 'томат': 'помидоры', 'черри': 'помидоры',
+  'огурцы': 'огурцы', 'огурец': 'огурцы',
+  'лук': 'лук', 'луковица': 'лук', 'лук репчатый': 'лук',
+  'лук красный': 'лук красный', 'красный лук': 'лук красный',
+  'морковь': 'морковь', 'морковка': 'морковь',
+  'картофель': 'картофель', 'картошка': 'картофель',
+  'перец болгарский': 'перец болгарский', 'болгарский перец': 'перец болгарский', 'сладкий перец': 'перец болгарский',
+  'капуста': 'капуста', 'капуста белокочанная': 'капуста',
+  'свёкла': 'свёкла', 'свекла': 'свёкла',
+  'кабачок': 'кабачок', 'кабачки': 'кабачок',
+  'баклажан': 'баклажан', 'баклажаны': 'баклажан',
+  'брокколи': 'брокколи', 'тыква': 'тыква',
+  'зелень': 'зелень', 'укроп': 'зелень', 'петрушка': 'зелень', 'зелёный лук': 'зелень',
+  'зеленый лук': 'зелень', 'базилик': 'зелень', 'кинза': 'зелень',
+  'чеснок': 'чеснок', 'лимон': 'лимон', 'апельсин': 'апельсин', 'апельсины': 'апельсин',
+  'молоко': 'молоко', 'сливки': 'сливки', 'сметана': 'сметана',
+  'йогурт': 'йогурт', 'кефир': 'кефир', 'творог': 'творог',
+  'сыр': 'сыр', 'пармезан': 'сыр', 'сыр твёрдый': 'сыр', 'сыр твердый': 'сыр', 'моцарелла': 'сыр',
+  'творожный сыр': 'творожный сыр', 'рикотта': 'творожный сыр',
+  'фета': 'фета', 'брынза': 'фета',
+  'масло сливочное': 'масло сливочное', 'сливочное масло': 'масло сливочное',
+  'масло растительное': 'масло растительное', 'растительное масло': 'масло растительное',
+  'масло оливковое': 'масло растительное', 'оливковое масло': 'масло растительное',
+  'мука': 'мука', 'мука пшеничная': 'мука',
+  'рис': 'рис', 'рис белый': 'рис', 'гречка': 'гречка', 'гречневая крупа': 'гречка',
+  'овсянка': 'овсянка', 'овсяные хлопья': 'овсянка', 'хлопья': 'овсянка', 'геркулес': 'овсянка',
+  'пшено': 'пшено', 'манка': 'манка', 'манная крупа': 'манка',
+  'спагетти': 'спагетти', 'макароны': 'спагетти', 'паста': 'спагетти', 'пенне': 'спагетти',
+  'лапша': 'лапша', 'лапша рисовая': 'лапша', 'рисовая лапша': 'лапша',
+  'хлеб': 'хлеб', 'батон': 'хлеб', 'булка': 'хлеб', 'тосты': 'хлеб', 'лаваш': 'лаваш',
+  'фарш': 'фарш', 'фарш говяжий': 'фарш', 'фарш свиной': 'фарш', 'фарш куриный': 'фарш',
+  'индейка': 'индейка', 'фарш индейки': 'индейка', 'филе индейки': 'индейка',
+  'говядина': 'говядина', 'свинина': 'свинина', 'мясо': 'говядина',
+  'бекон': 'бекон', 'колбаса': 'колбаса', 'сосиски': 'сосиски',
+  'рыба': 'рыба', 'треска': 'рыба', 'минтай': 'рыба', 'рыбное филе': 'рыба', 'лосось': 'рыба',
+  'тунец': 'тунец', 'тунец консервированный': 'тунец', 'тунец в масле': 'тунец',
+  'фасоль': 'фасоль', 'фасоль консервированная': 'фасоль',
+  'горошек': 'горошек', 'зелёный горошек': 'горошек', 'зеленый горошек': 'горошек',
+  'нут': 'нут', 'нут консервированный': 'нут',
+  'оливки': 'оливки', 'маслины': 'оливки',
+  'соевый соус': 'соевый соус', 'соус соевый': 'соевый соус',
+  'томатная паста': 'томатная паста', 'паста томатная': 'томатная паста', 'томат-паста': 'томатная паста',
+  'сахар': 'сахар', 'сахарный песок': 'сахар', 'соль': 'соль',
+  'перец чёрный': 'перец чёрный', 'перец черный': 'перец чёрный', 'перец молотый': 'перец чёрный',
+  'паприка': 'паприка', 'дрожжи': 'дрожжи', 'мёд': 'мёд', 'мед': 'мёд',
+  'орехи': 'орехи', 'грецкие орехи': 'орехи', 'миндаль': 'орехи', 'фундук': 'орехи', 'кешью': 'орехи',
+  'банан': 'банан', 'бананы': 'банан', 'яблоко': 'яблоко', 'яблоки': 'яблоко',
+  'ягоды': 'ягоды', 'клубника': 'ягоды', 'черника': 'ягоды', 'малина': 'ягоды', 'замороженные ягоды': 'ягоды',
+  'авокадо': 'авокадо',
+  'сухофрукты': 'сухофрукты', 'изюм': 'сухофрукты', 'курага': 'сухофрукты', 'чернослив': 'сухофрукты',
+  'тахини': 'тахини', 'кунжутная паста': 'тахини', 'гранола': 'гранола',
+  'грибы': 'грибы', 'шампиньоны': 'грибы', 'вода': 'вода'
+};
+
+function normName(raw) {
+  return String(raw == null ? '' : raw).toLowerCase().replace(/ё/g, 'е')
+    .replace(/[^a-zа-я0-9\s.]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+function stemName(n) {
+  if (n.length <= 4) return n;
+  const cut = n.replace(/(ами|ями|ов|ев|ей|ах|ях|ом|ем|ой|ый|ая|ое|ие|ые|ы|и|а|я|у|ю|е|о)$/, '');
+  return cut.length >= 3 ? cut : n;
+}
+function canonName(raw) {
+  const n = normName(raw);
+  if (!n) return '';
+  if (SYN[n]) return SYN[n];
+  const noDot = n.replace(/\./g, ' ').replace(/\s+/g, ' ').trim();
+  if (SYN[noDot]) return SYN[noDot];
+  for (const cut of [1, 2, 3]) {
+    const stem = n.slice(0, -cut);
+    if (stem.length >= 3 && SYN[stem]) return SYN[stem];
+  }
+  return stemName(n);
+}
+function sameItem(a, b) {
+  const x = canonName(a), y = canonName(b);
+  if (!x || !y) return false;
+  if (x === y) return true;
+  if (x.length >= 4 && y.length >= 4 && (x.includes(y) || y.includes(x))) return true;
+  return false;
+}
+
+const CATS = [
+  { id: 'veg', label: 'Овощи и фрукты' },
+  { id: 'meat', label: 'Мясо и рыба' },
+  { id: 'dairy', label: 'Молочное и яйца' },
+  { id: 'grain', label: 'Крупы, хлеб, макароны' },
+  { id: 'grocery', label: 'Бакалея' },
+  { id: 'other', label: 'Другое' }
+];
+const CAT_RULES = [
+  ['meat', ['курин', 'куриц', 'мяс', 'фарш', 'индейк', 'говяд', 'свинин', 'бекон', 'колбас', 'сосиск', 'рыб', 'треск', 'минтай', 'тунец', 'бедр', 'грудк']],
+  ['dairy', ['молок', 'сливк', 'сметан', 'йогурт', 'кефир', 'творог', 'сыр', 'фета', 'яйц', 'масло сливочное']],
+  ['veg', ['помидор', 'томат', 'огур', 'лук', 'морков', 'картоф', 'перец', 'капуст', 'свекл', 'кабач', 'баклаж', 'брокколи', 'тыкв', 'зелен', 'чеснок', 'лимон', 'банан', 'яблок', 'ягод', 'авокадо', 'апельсин', 'гриб', 'шампинь', 'нут', 'фасол', 'горош']],
+  ['grain', ['рис', 'греч', 'овсян', 'пшен', 'манк', 'спагет', 'макарон', 'лапш', 'мука', 'хлеб', 'лаваш', 'гранол']],
+  ['grocery', ['масло', 'соус', 'паста', 'сахар', 'соль', 'мед', 'мёд', 'орех', 'сухофрукт', 'оливк', 'дрожж', 'тахини', 'паприк']]
+];
+function guessCat(name) {
+  const n = normName(name);
+  for (const [cat, words] of CAT_RULES) {
+    for (const w of words) if (n.includes(w)) return cat;
+  }
+  return 'other';
+}
+
+const MEAT_SET = new Set(['куриная грудка', 'куриные бёдра', 'курица', 'индейка', 'говядина', 'свинина', 'фарш', 'бекон', 'колбаса', 'сосиски']);
+const FISH_SET = new Set(['рыба', 'тунец']);
+function recipeProteins(r) {
+  return r.ing.map((x) => canonName(x[0])).filter((c) => MEAT_SET.has(c) || FISH_SET.has(c));
+}
+function plural(n, one, few, many) {
+  const a = Math.abs(n) % 100, b = a % 10;
+  if (a > 10 && a < 20) return many;
+  if (b > 1 && b < 5) return few;
+  if (b === 1) return one;
+  return many;
+}
+function fmtQty(q) {
+  const n = Math.round(Number(q) * 10) / 10;
+  return String(n).replace('.', ',');
+}
+function escAttr(s) { return esc(s).replace(/`/g, '&#96;'); }
+const BUILTIN = [
+  { id: 'b1', title: 'Омлет с помидорами и зеленью', meal: ['breakfast'], time: 12, servings: 2, kcal: 380, tags: ['быстро', 'вегетарианское'],
+    ing: [['яйца', 3, 'шт'], ['помидоры', 2, 'шт'], ['молоко', 50, 'мл'], ['масло сливочное', 10, 'г'], ['зелень', 10, 'г'], ['соль', 1, 'щепотка'], ['перец чёрный', 1, 'щепотка']],
+    steps: ['Взбить яйца с молоком, солью и перцем.', 'Обжарить ломтики помидоров на сливочном масле 2 минуты.', 'Залить яйцами и готовить под крышкой 5–6 минут.', 'Посыпать зеленью.'] },
+  { id: 'b2', title: 'Сырники из творога', meal: ['breakfast', 'snack'], time: 25, servings: 2, kcal: 420, tags: ['вегетарианское'],
+    ing: [['творог', 400, 'г'], ['яйца', 1, 'шт'], ['мука', 3, 'ст.л.'], ['сахар', 2, 'ст.л.'], ['масло растительное', 20, 'мл']],
+    steps: ['Смешать творог, яйцо, сахар и 2 ст. л. муки.', 'Слепить 8 сырников и обвалять в муке.', 'Обжарить по 3 минуты с каждой стороны на среднем огне.'] },
+  { id: 'b3', title: 'Овсянка с бананом и орехами', meal: ['breakfast'], time: 10, servings: 2, kcal: 450, tags: ['быстро', 'вегетарианское'],
+    ing: [['овсянка', 80, 'г'], ['молоко', 300, 'мл'], ['банан', 1, 'шт'], ['орехи', 20, 'г'], ['мёд', 1, 'ч.л.']],
+    steps: ['Довести молоко до кипения и всыпать хлопья.', 'Варить 5 минут, помешивая.', 'Снять с огня, добавить мёд и подать с кружками банана и орехами.'] },
+  { id: 'b4', title: 'Тосты с авокадо и яйцом', meal: ['breakfast'], time: 10, servings: 2, kcal: 430, tags: ['быстро', 'вегетарианское'],
+    ing: [['хлеб', 2, 'ломоть'], ['авокадо', 1, 'шт'], ['яйца', 2, 'шт'], ['лимон', 0.5, 'шт'], ['соль', 1, 'щепотка']],
+    steps: ['Подсушить хлеб на сухой сковороде.', 'Размять авокадо с соком лимона и солью.', 'Сварить яйца всмятку 4 минуты.', 'Намазать тосты авокадо и положить сверху яйца.'] },
+  { id: 'b5', title: 'Шакшука с болгарским перцем', meal: ['breakfast', 'lunch'], time: 25, servings: 2, kcal: 410, tags: ['вегетарианское'],
+    ing: [['яйца', 4, 'шт'], ['помидоры', 4, 'шт'], ['перец болгарский', 1, 'шт'], ['лук', 1, 'шт'], ['чеснок', 2, 'зуб.'], ['паприка', 1, 'ч.л.'], ['масло растительное', 20, 'мл']],
+    steps: ['Обжарить лук и перец 5 минут.', 'Добавить чеснок, паприку и нарезанные помидоры, тушить 10 минут.', 'Сделать углубления, вбить яйца, накрыть крышкой и готовить 5 минут.'] },
+  { id: 'b6', title: 'Творог с ягодами и мёдом', meal: ['breakfast', 'snack'], time: 3, servings: 2, kcal: 260, tags: ['быстро', 'вегетарианское'],
+    ing: [['творог', 200, 'г'], ['ягоды', 100, 'г'], ['мёд', 1, 'ст.л.']],
+    steps: ['Выложить творог в миску.', 'Добавить ягоды и полить мёдом.'] },
+  { id: 'b7', title: 'Блины на молоке', meal: ['breakfast'], time: 30, servings: 3, kcal: 340, tags: ['вегетарианское'],
+    ing: [['мука', 200, 'г'], ['молоко', 400, 'мл'], ['яйца', 2, 'шт'], ['сахар', 1, 'ст.л.'], ['соль', 1, 'щепотка'], ['масло растительное', 15, 'мл']],
+    steps: ['Взбить яйца с сахаром и солью, влить молоко.', 'Всыпать муку и размешать до однородности, дать постоять 10 минут.', 'Жарить тонкие блины по 1 минуте с каждой стороны.'] },
+  { id: 'b8', title: 'Бананово-йогуртовый смузи', meal: ['breakfast', 'snack'], time: 5, servings: 2, kcal: 300, tags: ['быстро', 'вегетарианское'],
+    ing: [['банан', 1, 'шт'], ['йогурт', 200, 'г'], ['молоко', 100, 'мл'], ['овсянка', 30, 'г']],
+    steps: ['Сложить все ингредиенты в блендер.', 'Пробить до гладкости, при желании добавить мёд.'] },
+  { id: 'b9', title: 'Пшённая каша с тыквой', meal: ['breakfast'], time: 30, servings: 2, kcal: 360, tags: ['вегетарианское'],
+    ing: [['пшено', 80, 'г'], ['тыква', 200, 'г'], ['молоко', 300, 'мл'], ['масло сливочное', 10, 'г']],
+    steps: ['Промыть пшено, тыкву нарезать кубиками.', 'Варить крупу с тыквой в молоке 20 минут на медленном огне.', 'Заправить маслом перед подачей.'] },
+  { id: 'b10', title: 'Гречка с маслом и яйцом', meal: ['breakfast'], time: 20, servings: 2, kcal: 420, tags: ['вегетарианское'],
+    ing: [['гречка', 100, 'г'], ['вода', 250, 'мл'], ['масло сливочное', 15, 'г'], ['яйца', 2, 'шт']],
+    steps: ['Промыть гречку и залить водой.', 'Довести до кипения и варить 15 минут под крышкой.', 'Сварить яйца вкрутую, подать кашу с маслом и половинками яйца.'] },
+  { id: 'l1', title: 'Куриная грудка с овощами на сковороде', meal: ['lunch', 'dinner'], time: 25, servings: 2, kcal: 380, tags: ['быстро'],
+    ing: [['куриная грудка', 500, 'г'], ['кабачок', 1, 'шт'], ['перец болгарский', 1, 'шт'], ['лук', 1, 'шт'], ['масло растительное', 20, 'мл'], ['паприка', 1, 'ч.л.'], ['соль', 1, 'щепотка']],
+    steps: ['Нарезать грудку кусочками и обжарить 7 минут до золотистой корочки.', 'Добавить лук, перец и кабачок, готовить ещё 10 минут.', 'Приправить паприкой и солью.'] },
+  { id: 'l2', title: 'Паста с томатами и зеленью', meal: ['lunch', 'dinner'], time: 25, servings: 2, kcal: 520, tags: ['быстро', 'вегетарианское'],
+    ing: [['спагетти', 250, 'г'], ['помидоры', 4, 'шт'], ['чеснок', 2, 'зуб.'], ['масло растительное', 30, 'мл'], ['зелень', 15, 'г'], ['соль', 1, 'щепотка']],
+    steps: ['Отварить спагетти по инструкции на упаковке.', 'Обжарить чеснок в масле, добавить нарезанные помидоры и тушить 10 минут.', 'Смешать с пастой, посолить и посыпать зеленью.'] },
+  { id: 'l3', title: 'Куриный суп с лапшой', meal: ['lunch'], time: 50, servings: 4, kcal: 380,
+    ing: [['курица', 500, 'г'], ['картофель', 3, 'шт'], ['морковь', 1, 'шт'], ['лук', 1, 'шт'], ['лапша', 100, 'г'], ['зелень', 15, 'г'], ['соль', 1, 'щепотка']],
+    steps: ['Варить курицу 30 минут, снимая пену.', 'Добавить картофель, морковь и лук, варить ещё 15 минут.', 'Всыпать лапшу, готовить 3 минуты и посыпать зеленью.'] },
+  { id: 'l4', title: 'Борщ с говядиной', meal: ['lunch'], time: 90, servings: 4, kcal: 380,
+    ing: [['свёкла', 1, 'шт'], ['капуста', 300, 'г'], ['картофель', 3, 'шт'], ['морковь', 1, 'шт'], ['лук', 1, 'шт'], ['говядина', 400, 'г'], ['томатная паста', 2, 'ст.л.'], ['масло растительное', 20, 'мл']],
+    steps: ['Сварить мясо до готовности, около 40 минут.', 'Добавить картофель, через 10 минут — нашинкованную капусту.', 'Свёклу, морковь и лук обжарить с томатной пастой и отправить в кастрюлю.', 'Варить 15 минут и дать настояться под крышкой.'] },
+  { id: 'l5', title: 'Жареный рис с яйцом и овощами', meal: ['lunch', 'dinner'], time: 25, servings: 2, kcal: 480, tags: ['быстро', 'вегетарианское'],
+    ing: [['рис', 250, 'г'], ['яйца', 2, 'шт'], ['морковь', 1, 'шт'], ['горошек', 100, 'г'], ['соевый соус', 3, 'ст.л.'], ['масло растительное', 20, 'мл']],
+    steps: ['Отварить рис и остудить.', 'Обжарить морковь и горошек 3 минуты.', 'Добавить рис и соевый соус, затем яйца и жарить, помешивая, 4 минуты.'] },
+  { id: 'l6', title: 'Котлеты из индейки с пюре', meal: ['lunch', 'dinner'], time: 45, servings: 3, kcal: 540,
+    ing: [['индейка', 500, 'г'], ['яйца', 1, 'шт'], ['лук', 1, 'шт'], ['мука', 50, 'г'], ['картофель', 600, 'г'], ['молоко', 100, 'мл'], ['масло сливочное', 20, 'г']],
+    steps: ['Смешать фарш из индейки с яйцом и тёртым луком, посолить.', 'Сформовать котлеты и обжарить по 5 минут с каждой стороны.', 'Отварить картофель и размять с молоком и маслом.'] },
+  { id: 'l7', title: 'Плов с курицей', meal: ['lunch', 'dinner'], time: 50, servings: 4, kcal: 540,
+    ing: [['рис', 300, 'г'], ['куриные бёдра', 500, 'г'], ['морковь', 2, 'шт'], ['лук', 2, 'шт'], ['чеснок', 4, 'зуб.'], ['масло растительное', 40, 'мл']],
+    steps: ['Обжарить курицу до корочки.', 'Добавить лук и морковь соломкой, готовить 7 минут.', 'Всыпать рис, залить водой на 1,5 см выше крупы, вставить чеснок и томить 25 минут под крышкой.'] },
+  { id: 'l8', title: 'Рыба, запечённая с картофелем', meal: ['lunch', 'dinner'], time: 45, servings: 3, kcal: 450,
+    ing: [['рыба', 600, 'г'], ['картофель', 600, 'г'], ['лук', 1, 'шт'], ['лимон', 0.5, 'шт'], ['масло растительное', 30, 'мл']],
+    steps: ['Картофель нарезать ломтиками и выложить в форму.', 'Сверху положить рыбу и кольца лука, посолить.', 'Полить маслом и соком лимона, запекать 30 минут при 200 °C.'] },
+  { id: 'l9', title: 'Тыквенный суп-пюре', meal: ['lunch'], time: 40, servings: 3, kcal: 320, tags: ['вегетарианское'],
+    ing: [['тыква', 700, 'г'], ['картофель', 2, 'шт'], ['лук', 1, 'шт'], ['сливки', 150, 'мл'], ['масло растительное', 20, 'мл']],
+    steps: ['Обжарить лук, добавить тыкву и картофель кубиками.', 'Залить водой на 2 см и варить 20 минут.', 'Пробить блендером, влить сливки и прогреть.'] },
+  { id: 'l10', title: 'Паста с курицей и сливками', meal: ['lunch', 'dinner'], time: 30, servings: 2, kcal: 620,
+    ing: [['спагетти', 250, 'г'], ['куриная грудка', 400, 'г'], ['сливки', 200, 'мл'], ['лук', 1, 'шт'], ['сыр', 50, 'г']],
+    steps: ['Обжарить грудку кусочками с луком 10 минут.', 'Влить сливки и прогреть 3 минуты.', 'Смешать с варёной пастой и посыпать тёртым сыром.'] },
+  { id: 'l11', title: 'Тефтели в томатном соусе с рисом', meal: ['lunch', 'dinner'], time: 45, servings: 3, kcal: 580,
+    ing: [['фарш', 500, 'г'], ['рис', 200, 'г'], ['лук', 1, 'шт'], ['яйца', 1, 'шт'], ['помидоры', 3, 'шт'], ['томатная паста', 1, 'ст.л.']],
+    steps: ['Смешать фарш с яйцом и мелко нарезанным луком.', 'Скатать тефтели и обжарить 5 минут.', 'Добавить помидоры с пастой и тушить 15 минут, подать с рисом.'] },
+  { id: 'l12', title: 'Фаршированные перцы', meal: ['lunch', 'dinner'], time: 60, servings: 3, kcal: 520,
+    ing: [['перец болгарский', 3, 'шт'], ['фарш', 400, 'г'], ['рис', 150, 'г'], ['лук', 1, 'шт'], ['морковь', 1, 'шт'], ['томатная паста', 2, 'ст.л.'], ['сметана', 100, 'г']],
+    steps: ['Смешать фарш с отварным рисом и обжаренным луком.', 'Наполнить перцы и выложить в форму.', 'Залить соусом из пасты, сметаны и воды, запекать 40 минут при 190 °C.'] },
+  { id: 'l13', title: 'Овощное рагу с фасолью', meal: ['lunch', 'dinner'], time: 40, servings: 3, kcal: 300, tags: ['веган', 'вегетарианское'],
+    ing: [['кабачок', 1, 'шт'], ['баклажан', 1, 'шт'], ['перец болгарский', 2, 'шт'], ['помидоры', 3, 'шт'], ['фасоль', 200, 'г'], ['лук', 1, 'шт'], ['чеснок', 2, 'зуб.']],
+    steps: ['Обжарить лук и перец 5 минут.', 'Добавить кабачок и баклажан, готовить 10 минут.', 'Ввести помидоры и фасоль, тушить 15 минут, в конце добавить чеснок.'] },
+  { id: 'l14', title: 'Гречка с курицей и морковью', meal: ['lunch', 'dinner'], time: 35, servings: 3, kcal: 480,
+    ing: [['гречка', 200, 'г'], ['куриная грудка', 400, 'г'], ['морковь', 1, 'шт'], ['лук', 1, 'шт'], ['масло растительное', 20, 'мл']],
+    steps: ['Обжарить курицу кусочками с луком и морковью 10 минут.', 'Всыпать гречку и залить водой вдвое больше крупы.', 'Тушить под крышкой 20 минут.'] },
+  { id: 'l15', title: 'Курица в духовке с брокколи и сыром', meal: ['dinner', 'lunch'], time: 40, servings: 2, kcal: 420,
+    ing: [['куриная грудка', 500, 'г'], ['брокколи', 400, 'г'], ['сметана', 100, 'г'], ['сыр', 80, 'г']],
+    steps: ['Выложить грудку и соцветия брокколи в форму.', 'Смазать сметаной и посолить.', 'Запекать 25 минут при 200 °C, за 7 минут до конца посыпать сыром.'] },
+  { id: 'l16', title: 'Домашняя шаурма', meal: ['dinner', 'lunch'], time: 30, servings: 2, kcal: 520, tags: ['быстро'],
+    ing: [['лаваш', 2, 'шт'], ['куриная грудка', 300, 'г'], ['капуста', 200, 'г'], ['огурец', 1, 'шт'], ['помидоры', 2, 'шт'], ['йогурт', 100, 'г'], ['чеснок', 2, 'зуб.']],
+    steps: ['Обжарить грудку полосками со специями.', 'Нашинковать капусту, нарезать овощи, смешать йогурт с чесноком.', 'Завернуть начинку в лаваш и прогреть на сухой сковороде.'] },
+  { id: 'l17', title: 'Салат с тунцом и фасолью', meal: ['lunch', 'dinner'], time: 15, servings: 2, kcal: 360, tags: ['быстро'],
+    ing: [['тунец', 1, 'банка'], ['фасоль', 200, 'г'], ['помидоры', 2, 'шт'], ['лук красный', 0.5, 'шт'], ['масло растительное', 2, 'ст.л.'], ['лимон', 0.5, 'шт']],
+    steps: ['Смешать тунец без жидкости, фасоль и нарезанные овощи.', 'Заправить маслом и соком лимона, посолить.'] },
+  { id: 'l18', title: 'Греческий салат', meal: ['dinner', 'lunch'], time: 15, servings: 2, kcal: 320, tags: ['быстро', 'вегетарианское'],
+    ing: [['помидоры', 3, 'шт'], ['огурцы', 2, 'шт'], ['перец болгарский', 1, 'шт'], ['лук красный', 0.5, 'шт'], ['фета', 100, 'г'], ['оливки', 50, 'г'], ['масло растительное', 2, 'ст.л.']],
+    steps: ['Нарезать овощи крупными кусками.', 'Добавить фету и оливки.', 'Заправить маслом, посолить и поперчить.'] },
+  { id: 'l19', title: 'Салат «Цезарь» с курицей', meal: ['dinner', 'lunch'], time: 25, servings: 2, kcal: 430, tags: ['быстро'],
+    ing: [['куриная грудка', 300, 'г'], ['хлеб', 2, 'ломоть'], ['сыр', 40, 'г'], ['йогурт', 100, 'г'], ['чеснок', 1, 'зуб.'], ['зелень', 30, 'г']],
+    steps: ['Обжарить грудку и нарезать полосками.', 'Хлеб подсушить кубиками.', 'Смешать йогурт с чесноком и солью, собрать салат и посыпать сыром.'] },
+  { id: 'l20', title: 'Картофельная запеканка с фаршем', meal: ['dinner', 'lunch'], time: 55, servings: 3, kcal: 560,
+    ing: [['картофель', 700, 'г'], ['фарш', 400, 'г'], ['лук', 1, 'шт'], ['молоко', 150, 'мл'], ['сыр', 50, 'г']],
+    steps: ['Отварить картофель и размять с молоком.', 'Обжарить фарш с луком.', 'Выложить слоями фарш и пюре, посыпать сыром и запекать 25 минут при 200 °C.'] },
+  { id: 'l21', title: 'Рисовая лапша с курицей и овощами', meal: ['dinner', 'lunch'], time: 25, servings: 2, kcal: 480, tags: ['быстро'],
+    ing: [['лапша', 200, 'г'], ['куриная грудка', 300, 'г'], ['перец болгарский', 1, 'шт'], ['морковь', 1, 'шт'], ['соевый соус', 3, 'ст.л.']],
+    steps: ['Запарить лапшу по инструкции.', 'Обжарить курицу с овощами 10 минут.', 'Добавить лапшу и соевый соус, прогреть 2 минуты.'] },
+  { id: 'l22', title: 'Куриные бёдра в духовке с овощами', meal: ['dinner'], time: 55, servings: 3, kcal: 520,
+    ing: [['куриные бёдра', 600, 'г'], ['картофель', 500, 'г'], ['морковь', 2, 'шт'], ['лук', 1, 'шт'], ['масло растительное', 30, 'мл']],
+    steps: ['Овощи нарезать крупно и смешать с маслом и солью.', 'Выложить в форму, сверху положить бёдра.', 'Запекать 45 минут при 200 °C.'] },
+  { id: 'l23', title: 'Треска с брокколи на пару', meal: ['dinner'], time: 25, servings: 2, kcal: 320, tags: ['быстро'],
+    ing: [['рыба', 500, 'г'], ['брокколи', 300, 'г'], ['лимон', 0.5, 'шт'], ['масло сливочное', 20, 'г']],
+    steps: ['Приготовить рыбу и брокколи на пару 15 минут.', 'Полить растопленным маслом и соком лимона.'] },
+  { id: 'l24', title: 'Пицца домашняя', meal: ['dinner'], time: 70, servings: 3, kcal: 640,
+    ing: [['мука', 300, 'г'], ['вода', 180, 'мл'], ['дрожжи', 5, 'г'], ['томатная паста', 3, 'ст.л.'], ['сыр', 150, 'г'], ['колбаса', 100, 'г']],
+    steps: ['Замесить тесто из муки, воды, дрожжей и соли, дать подойти 40 минут.', 'Растянуть по форме и смазать пастой.', 'Выложить начинку и сыр, печь 15 минут при 220 °C.'] },
+  { id: 'l25', title: 'Картофель с грибами на сковороде', meal: ['dinner', 'lunch'], time: 40, servings: 2, kcal: 420, tags: ['вегетарианское'],
+    ing: [['картофель', 700, 'г'], ['грибы', 300, 'г'], ['лук', 1, 'шт'], ['масло растительное', 30, 'мл'], ['зелень', 15, 'г']],
+    steps: ['Обжарить лук, добавить грибы и готовить 10 минут.', 'Добавить картофель ломтиками, накрыть и тушить 20 минут.', 'Посыпать зеленью.'] },
+  { id: 'l26', title: 'Курица терияки с рисом', meal: ['dinner'], time: 30, servings: 2, kcal: 560, tags: ['быстро'],
+    ing: [['куриные бёдра', 500, 'г'], ['рис', 200, 'г'], ['соевый соус', 4, 'ст.л.'], ['мёд', 1, 'ст.л.'], ['чеснок', 2, 'зуб.']],
+    steps: ['Обжарить курицу кусочками 10 минут.', 'Смешать соевый соус, мёд и чеснок, влить к курице и уварить 5 минут.', 'Подать с отварным рисом.'] },
+  { id: 's1', title: 'Хумус с овощными палочками', meal: ['snack'], time: 10, servings: 3, kcal: 250, tags: ['быстро', 'веган', 'вегетарианское'],
+    ing: [['нут', 200, 'г'], ['тахини', 1, 'ст.л.'], ['чеснок', 1, 'зуб.'], ['лимон', 0.5, 'шт'], ['морковь', 1, 'шт'], ['огурец', 1, 'шт']],
+    steps: ['Пробить нут с тахини, чесноком, соком лимона и 3 ст. л. воды до пасты.', 'Подать с палочками из моркови и огурца.'] },
+  { id: 's2', title: 'Домашняя гранола', meal: ['snack', 'breakfast'], time: 30, servings: 5, kcal: 380, tags: ['вегетарианское'],
+    ing: [['овсянка', 200, 'г'], ['орехи', 100, 'г'], ['мёд', 60, 'г'], ['масло растительное', 40, 'мл'], ['сухофрукты', 100, 'г']],
+    steps: ['Смешать хлопья, орехи, мёд и масло.', 'Разложить на противне и запекать 20 минут при 160 °C, помешивая.', 'Добавить сухофрукты после остывания.'] },
+  { id: 's3', title: 'Йогурт с ягодами и гранолой', meal: ['snack', 'breakfast'], time: 3, servings: 1, kcal: 260, tags: ['быстро', 'вегетарианское'],
+    ing: [['йогурт', 200, 'г'], ['ягоды', 100, 'г'], ['гранола', 40, 'г']],
+    steps: ['Выложить йогурт в стакан.', 'Добавить слоями ягоды и гранолу.'] },
+  { id: 's4', title: 'Фруктовый салат с йогуртом', meal: ['snack'], time: 5, servings: 2, kcal: 210, tags: ['быстро', 'вегетарианское'],
+    ing: [['яблоко', 1, 'шт'], ['банан', 1, 'шт'], ['апельсин', 1, 'шт'], ['йогурт', 100, 'г']],
+    steps: ['Нарезать фрукты кусочками.', 'Заправить йогуртом и аккуратно перемешать.'] },
+  { id: 's5', title: 'Тост с творожным сыром и огурцом', meal: ['snack', 'breakfast'], time: 5, servings: 1, kcal: 240, tags: ['быстро', 'вегетарианское'],
+    ing: [['хлеб', 2, 'ломоть'], ['творожный сыр', 60, 'г'], ['огурец', 1, 'шт'], ['зелень', 10, 'г']],
+    steps: ['Подсушить хлеб и намазать творожным сыром.', 'Выложить кружки огурца и зелень.'] },
+  { id: 's6', title: 'Ореховые батончики без выпечки', meal: ['snack'], time: 20, servings: 6, kcal: 320, tags: ['вегетарианское'],
+    ing: [['овсянка', 150, 'г'], ['орехи', 80, 'г'], ['мёд', 50, 'г'], ['сухофрукты', 80, 'г']],
+    steps: ['Измельчить орехи и сухофрукты, смешать с хлопьями и мёдом.', 'Утрамбовать в форму и охлаждать час.', 'Нарезать батончиками.'] },
+  { id: 's7', title: 'Творожная запеканка', meal: ['snack', 'breakfast'], time: 50, servings: 4, kcal: 300, tags: ['вегетарианское'],
+    ing: [['творог', 500, 'г'], ['яйца', 3, 'шт'], ['манка', 50, 'г'], ['сахар', 50, 'г'], ['молоко', 100, 'мл']],
+    steps: ['Смешать творог, яйца, манку, сахар и молоко.', 'Выложить в форму и запекать 40 минут при 180 °C.'] }
+];
+const STORE_KEY = 'polka.state.v1';
+
+function defaultState() {
+  return {
+    pantry: [],
+    custom: [],
+    fav: [],
+    tombstones: [],
+    prefs: { days: 5, meals: ['breakfast', 'lunch', 'dinner'], portions: 2, veg: false, fish: false, quick: false, kidMenu: false, kidPortions: 1 },
+    plan: null
+  };
+}
+function normalizeRecipe(raw, builtin) {
+  if (!raw || typeof raw !== 'object') return null;
+  const title = String(raw.title || '').trim();
+  if (!title) return null;
+  let meal = raw.meal || ['lunch'];
+  if (typeof meal === 'string') meal = [meal];
+  const mapM = { 'завтрак': 'breakfast', 'обед': 'lunch', 'ужин': 'dinner', 'перекус': 'snack', breakfast: 'breakfast', lunch: 'lunch', dinner: 'dinner', snack: 'snack' };
+  meal = meal.map((m) => mapM[String(m).toLowerCase().trim()] || 'lunch');
+  meal = Array.from(new Set(meal));
+  const ing = (Array.isArray(raw.ing) ? raw.ing : []).map((x) => {
+    if (Array.isArray(x)) return [String(x[0] || '').trim(), Number(x[1]) || 1, String(x[2] || 'шт')];
+    if (x && typeof x === 'object') return [String(x.name || x.n || '').trim(), Number(x.qty || x.q) || 1, String(x.unit || x.u || 'шт')];
+    return parseIngLine(String(x || ''));
+  }).filter((x) => x && x[0]);
+  const steps = (Array.isArray(raw.steps) ? raw.steps : String(raw.steps || '').split(/\n+/)).map((s) => String(s).trim()).filter(Boolean);
+  return {
+    id: raw.id || ('u' + Math.random().toString(36).slice(2, 9)),
+    title,
+    meal: meal.length ? meal : ['lunch'],
+    time: Math.max(1, Number(raw.time) || 30),
+    servings: Math.max(1, Number(raw.servings) || 2),
+    kcal: Number(raw.kcal) || 0,
+    tags: (Array.isArray(raw.tags) ? raw.tags : String(raw.tags || '').split(',')).map((t) => String(t).trim()).filter(Boolean),
+    ing,
+    steps,
+    updatedAt: Number(raw.updatedAt) || 0,
+    kid: !!raw.kid,
+    builtin: !!builtin
+  };
+}
+function parseIngLine(line) {
+  let s = String(line || '').replace(/^[-–•*\s]+/, '').trim();
+  if (!s) return null;
+  let unitless = false;
+  if (/по\s+вкусу$/i.test(s)) { s = s.replace(/\s*[—–-]?\s*по\s+вкусу$/i, '').trim(); unitless = true; }
+  if (!s) return null;
+  const m = s.match(/^(.+?)\s*[—–\-:]?\s*(\d+(?:[.,]\d+)?)\s*(г|кг|мл|л|шт|пучок|зуб\.?|ломоть|ломо?тя|банка|банки|упаковка|упак\.?|ст\.?\s?л\.?|ч\.?\s?л\.?)?\s*$/i);
+  if (!m) return [s, 1, unitless ? 'щепотка' : 'шт'];
+  let unit = (m[3] || 'шт').toLowerCase().replace(/\s/g, '');
+  if (/^зуб/.test(unit)) unit = 'зуб.';
+  if (/^ст/.test(unit)) unit = 'ст.л.';
+  if (/^ч/.test(unit)) unit = 'ч.л.';
+  if (/^(банк|упак)/.test(unit)) unit = unit.startsWith('банк') ? 'банка' : 'упаковка';
+  if (/^лом/.test(unit)) unit = 'ломоть';
+  return [m[1].trim(), Number(m[2].replace(',', '.')), unit];
+}
+function loadState() {
+  const base = defaultState();
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return base;
+    const p = JSON.parse(raw);
+    return {
+      pantry: Array.isArray(p.pantry) ? p.pantry.filter((x) => x && x.name).map((x) => ({
+        id: x.id || ('p' + Math.random().toString(36).slice(2, 9)),
+        name: String(x.name),
+        qty: Number(x.qty) || 0,
+        unit: x.unit || 'шт',
+        cat: x.cat || guessCat(x.name),
+        days: x.days == null ? null : Number(x.days),
+        added: Number(x.added) || Date.now()
+      })) : [],
+      custom: Array.isArray(p.custom) ? p.custom.map((r) => normalizeRecipe(r, false)).filter(Boolean) : [],
+      fav: Array.isArray(p.fav) ? p.fav : [],
+      tombstones: Array.isArray(p.tombstones) ? p.tombstones.slice(-500) : [],
+      prefs: Object.assign({}, base.prefs, p.prefs || {}),
+      plan: p.plan && Array.isArray(p.plan.slots) ? p.plan : null
+    };
+  } catch (err) {
+    return base;
+  }
+}
+let S = loadState();
+let storageWarned = false;
+let toastTimer = null;
+
+function saveState() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); return true; }
+  catch (err) {
+    if (!storageWarned) { storageWarned = true; toast('Браузер не разрешил сохранение — данные живут до закрытия вкладки'); }
+    return false;
+  }
+}
+let builtinCache = null;
+const KID_IDS = new Set(['b1', 'b2', 'b3', 'b4', 'b6', 'b7', 'b8', 'b9', 'b10', 'l2', 'l3', 'l6', 'l9', 'l11', 'l13', 'l14', 'l15', 'l18', 'l20', 'l23', 's1', 's3', 's4', 's5', 's7']);
+function builtinRecipes() {
+  if (!builtinCache) builtinCache = BUILTIN.map((r) => normalizeRecipe(Object.assign({ kid: KID_IDS.has(r.id) }, r), true)).filter(Boolean);
+  return builtinCache;
+}
+function allRecipes() { return builtinRecipes().concat(S.custom); }
+function byId(id) { return allRecipes().find((r) => r.id === id) || null; }
+
+function toast(msg) {
+  const el = $('#toast');
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
+}
+
+function shelfDaysLeft(p) {
+  if (p.days == null || isNaN(p.days)) return null;
+  return Math.ceil((p.added + Number(p.days) * 86400000 - Date.now()) / 86400000);
+}
+
+function addProductToPantry(name, qty, unit, days) {
+  const existing = S.pantry.find((p) => sameItem(p.name, name) && p.unit === unit);
+  if (existing) {
+    existing.qty = Math.round((existing.qty + qty) * 100) / 100;
+    if (days != null) { existing.days = days; existing.added = Date.now(); }
+    return existing;
+  }
+  const item = {
+    id: 'p' + Math.random().toString(36).slice(2, 9),
+    name, qty, unit,
+    cat: guessCat(name),
+    days: days == null ? null : days,
+    added: Date.now()
+  };
+  S.pantry.push(item);
+  return item;
+}
+
+function productRow(p) {
+  const d = shelfDaysLeft(p);
+  let badge = '';
+  if (d != null) {
+    const cls = d <= 1 ? 'hot' : d <= 3 ? 'warn' : 'fine';
+    const txt = d < 0 ? 'срок истёк' : d === 0 ? 'сегодня' : d + ' ' + plural(d, 'день', 'дня', 'дней');
+    badge = '<span class="badge ' + cls + '" data-shelf="' + p.id + '">' + esc(txt) + '</span>';
+  }
+  return '<div class="prod-row" data-id="' + p.id + '">' +
+    '<span class="dot" data-cat="' + p.cat + '"></span>' +
+    '<div class="prod-name"><input value="' + escAttr(p.name) + '" data-name aria-label="Название продукта"></div>' +
+    '<div class="qty-wrap"><input class="prod-qty" type="number" min="0" step="any" value="' + p.qty + '" data-qty aria-label="Количество продукта">' +
+    '<span class="prod-unit">' + esc(p.unit) + '</span></div>' +
+    '<div class="shelf"><input type="number" min="0" max="90" value="' + (p.days == null ? '' : p.days) + '" data-days aria-label="Срок годности в днях" placeholder="—"><span class="cap">дн.</span></div>' +
+    badge +
+    '<button class="icon-btn" type="button" data-del="' + p.id + '" aria-label="Удалить ' + escAttr(p.name) + '">×</button>' +
+    '</div>';
+}
+
+function renderPantry() {
+  const box = $('#pantry-list');
+  if (!S.pantry.length) {
+    box.innerHTML = '<div class="empty"><h3>Холодильник пока пуст</h3>' +
+      '<p>Добавьте то, что уже купили: грудку, яйца, овощи, крупы. План питания соберётся из этих продуктов.</p>' +
+      '<button class="btn primary" type="button" id="demo-fill">Заполнить примером</button></div>';
+  } else {
+    const groups = CATS.map((c) => ({ c, items: S.pantry.filter((p) => p.cat === c.id) })).filter((g) => g.items.length);
+    box.innerHTML = groups.map((g) =>
+      '<section class="group"><div class="group-head"><span>' + esc(g.c.label) + '</span>' +
+      '<span class="cnt">' + g.items.length + '</span><span class="line"></span></div>' +
+      g.items.map(productRow).join('') + '</section>'
+    ).join('');
+  }
+  const soon = S.pantry.filter((p) => { const d = shelfDaysLeft(p); return d != null && d <= 3; }).length;
+  $('#p-count').textContent = S.pantry.length;
+  $('#p-soon').textContent = soon;
+  renderSoon();
+}
+
+function renderSoon() {
+  const box = $('#soon-list');
+  if (!box) return;
+  const rows = S.pantry.map((p) => ({ p, d: shelfDaysLeft(p) }))
+    .filter((x) => x.d != null && x.d <= 5)
+    .sort((a, b) => a.d - b.d);
+  if (!rows.length) {
+    box.innerHTML = '<li class="muted small">Ничего не подгорает. Укажите срок хранения у продуктов.</li>';
+    return;
+  }
+  box.innerHTML = rows.slice(0, 6).map((x) => {
+    const cls = x.d <= 1 ? 'hot' : x.d <= 3 ? 'warn' : 'fine';
+    const txt = x.d < 0 ? 'истёк' : x.d === 0 ? 'сегодня' : x.d + ' дн.';
+    return '<li class="soon-item"><span class="nm">' + esc(x.p.name) + '</span><span class="badge ' + cls + '">' + txt + '</span></li>';
+  }).join('');
+}
+
+function refreshShelf() {
+  if (document.hidden) return;
+  S.pantry.forEach((p) => {
+    const el = document.querySelector('[data-shelf="' + p.id + '"]');
+    if (!el) return;
+    const d = shelfDaysLeft(p);
+    if (d == null) { el.remove(); return; }
+    el.className = 'badge ' + (d <= 1 ? 'hot' : d <= 3 ? 'warn' : 'fine');
+    el.textContent = d < 0 ? 'срок истёк' : d === 0 ? 'сегодня' : d + ' ' + plural(d, 'день', 'дня', 'дней');
+  });
+  renderSoon();
+}
+
+function fillSuggest() {
+  const set = new Set();
+  allRecipes().forEach((r) => r.ing.forEach((x) => set.add(x[0])));
+  $('#ing-suggest').innerHTML = Array.from(set).sort((a, b) => a.localeCompare(b, 'ru'))
+    .map((n) => '<option value="' + escAttr(n) + '"></option>').join('');
+}
+
+function fillDemo() {
+  const demo = [
+    ['куриная грудка', 800, 'г', 2], ['яйца', 10, 'шт', 12], ['молоко', 1, 'л', 4],
+    ['помидоры', 6, 'шт', 5], ['картофель', 1, 'кг', 14], ['рис', 500, 'г', 120],
+    ['гречка', 400, 'г', 120], ['лук', 3, 'шт', 20], ['морковь', 3, 'шт', 14],
+    ['сыр', 200, 'г', 10], ['сметана', 200, 'г', 5], ['хлеб', 1, 'шт', 2],
+    ['масло сливочное', 100, 'г', 14], ['масло растительное', 500, 'мл', 180],
+    ['чеснок', 1, 'шт', 30], ['зелень', 1, 'пучок', 3], ['банан', 3, 'шт', 4],
+    ['творог', 400, 'г', 4], ['овсянка', 400, 'г', 180], ['спагетти', 400, 'г', 200]
+  ];
+  demo.forEach((d) => addProductToPantry(d[0], d[1], d[2], d[3]));
+  saveState();
+  refresh();
+  toast('Пример заполнен — меняйте под себя');
+}
+function scaleFor(r, portions) { return (Number(portions) || 2) / (Number(r.servings) || 2); }
+function slotPortions(s) { return s && s.kid ? (Number(S.prefs.kidPortions) || 1) : (Number(S.prefs.portions) || 2); }
+function servingsScale(r) { return scaleFor(r, S.prefs.portions); }
+
+function checkIngredient(name, qty, unit) {
+  const c = canonName(name);
+  if (BASICS.has(c)) return { state: 'base' };
+  const items = S.pantry.filter((p) => sameItem(p.name, name));
+  if (!items.length) return { state: 'no', need: qty, unit };
+  const fam = unitFam(unit);
+  const same = items.filter((p) => unitFam(p.unit) === fam);
+  if (!same.length) {
+    return items.some((p) => p.qty > 0) ? { state: 'ok', approx: true } : { state: 'no', need: qty, unit };
+  }
+  const have = same.reduce((s, p) => s + baseQty(p.qty, p.unit), 0);
+  const need = baseQty(qty, unit);
+  if (have + 1e-9 >= need) return { state: 'ok', have, need };
+  if (have > 1e-9) return { state: 'part', have, need };
+  return { state: 'no', need };
+}
+
+function coverage(r, portions) {
+  const scale = scaleFor(r, portions || S.prefs.portions);
+  const req = r.ing.filter((x) => !BASICS.has(canonName(x[0])));
+  if (!req.length) return { have: 0, total: 0, pct: 1, missing: [] };
+  let ok = 0;
+  const missing = [];
+  req.forEach((x) => {
+    const st = checkIngredient(x[0], x[1] * scale, x[2]);
+    if (st.state === 'ok' || st.state === 'base') ok++;
+    else missing.push(x[0]);
+  });
+  return { have: ok, total: req.length, pct: ok / req.length, missing };
+}
+
+function passPrefs(r) {
+  if (S.prefs.quick && r.time > 30) return false;
+  const prots = recipeProteins(r);
+  if (prots.some((p) => FISH_SET.has(p)) && (S.prefs.fish || S.prefs.veg)) return false;
+  if (prots.some((p) => MEAT_SET.has(p)) && S.prefs.veg) return false;
+  return true;
+}
+
+function shoppingList() {
+  if (!S.plan) return [];
+  const pool = S.pantry.map((p) => Object.assign({}, p));
+  const map = new Map();
+  S.plan.slots.forEach((slot) => {
+    const r = byId(slot.rid);
+    if (!r) return;
+    const scale = scaleFor(r, slotPortions(slot));
+    r.ing.forEach((x) => {
+      const n = x[0], u = x[2];
+      const c = canonName(n);
+      if (BASICS.has(c)) return;
+      const fam = unitFam(u);
+      const need = baseQty(x[1] * scale, u);
+      let avail = 0;
+      pool.forEach((p) => {
+        if (unitFam(p.unit) === fam && sameItem(p.name, n)) avail += baseQty(p.qty, p.unit);
+      });
+      const take = Math.min(avail, need);
+      if (take > 0) {
+        let left = take;
+        pool.forEach((p) => {
+          if (left <= 1e-9) return;
+          if (unitFam(p.unit) !== fam || !sameItem(p.name, n)) return;
+          const pb = baseQty(p.qty, p.unit);
+          const d = Math.min(pb, left);
+          p.qty = Math.max(0, p.qty - d / unitFactor(p.unit));
+          left -= d;
+        });
+      }
+      const miss = need - take;
+      if (miss > 1e-6) {
+        const key = c + '|' + u;
+        const cur = map.get(key) || { name: n, unit: u, qty: 0, fam };
+        cur.qty += miss / unitFactor(u);
+        map.set(key, cur);
+      }
+    });
+  });
+  return Array.from(map.values()).map((x) => {
+    let q = x.qty;
+    if (x.fam === 'count' || x.fam === 'pack') q = Math.ceil(q - 1e-9);
+    else if (q >= 100) q = Math.ceil(q / 5) * 5;
+    else if (q >= 10) q = Math.ceil(q);
+    else q = Math.ceil(q * 2) / 2;
+    let unit = x.unit;
+    if (unit === 'г' && q >= 1000) { q = q / 1000; unit = 'кг'; }
+    if (unit === 'мл' && q >= 1000) { q = q / 1000; unit = 'л'; }
+    return { name: x.name, unit, qty: Math.round(q * 10) / 10 };
+  }).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+}
+
+function buildPlan() {
+  readPrefs();
+  const days = Math.min(14, Math.max(1, S.prefs.days));
+  const mealIds = MEALS.filter((m) => S.prefs.meals.includes(m.id)).map((m) => m.id);
+  if (!mealIds.length) { toast('Выберите хотя бы один приём пищи'); return; }
+  const pool = allRecipes().filter(passPrefs);
+  if (!pool.length) { toast('Под заданные условия не подошёл ни один рецепт'); return; }
+  const kidPool = S.prefs.kidMenu ? allRecipes().filter((r) => r.kid).filter(passPrefs) : [];
+  const slots = [];
+  const used = new Set();
+  const usage = {};
+  const lastByMeal = {};
+  const kidUsed = new Set();
+  const kidUsage = {};
+  let lastProtein = '';
+  for (let d = 0; d < days; d++) {
+    const dayProts = {};
+    mealIds.forEach((meal) => {
+      let cands = pool.filter((r) => r.meal.includes(meal) && !used.has(r.id));
+      if (!cands.length) cands = pool.filter((r) => r.meal.includes(meal));
+      if (!cands.length) return;
+      const scored = cands.map((r) => {
+        const cov = coverage(r).pct;
+        const prots = recipeProteins(r);
+        let sc = cov * 4 + Math.random() * 1.1 - (usage[r.id] || 0) * 2.2;
+        if (lastByMeal[meal] === r.id) sc -= 4;
+        if (prots.length && prots[0] === lastProtein) sc -= 0.9;
+        if (prots.some((p) => dayProts[p])) sc -= 1.7;
+        return { r, sc };
+      }).sort((a, b) => b.sc - a.sc);
+      const pick = scored[0].r;
+      used.add(pick.id);
+      usage[pick.id] = (usage[pick.id] || 0) + 1;
+      lastByMeal[meal] = pick.id;
+      recipeProteins(pick).forEach((p) => { dayProts[p] = true; lastProtein = p; });
+      slots.push({ day: d, meal, rid: pick.id, cooked: false });
+    });
+    if (S.prefs.kidMenu && kidPool.length) {
+      mealIds.forEach((meal) => {
+        let cands = kidPool.filter((r) => r.meal.includes(meal) && !kidUsed.has(r.id) && !used.has(r.id));
+        if (!cands.length) cands = kidPool.filter((r) => r.meal.includes(meal) && !kidUsed.has(r.id));
+        if (!cands.length) cands = kidPool.filter((r) => r.meal.includes(meal));
+        if (!cands.length) return;
+        const scored = cands.map((r) => {
+          const sc = coverage(r).pct * 3 + Math.random() * 0.9 - (kidUsage[r.id] || 0) * 2.6;
+          return { r, sc };
+        }).sort((a, b) => b.sc - a.sc);
+        const pick = scored[0].r;
+        kidUsed.add(pick.id);
+        kidUsage[pick.id] = (kidUsage[pick.id] || 0) + 1;
+        slots.push({ day: d, meal, rid: pick.id, cooked: false, kid: true });
+      });
+    }
+  }
+  const kidCount = slots.filter((s) => s.kid).length;
+  S.plan = { days, slots, created: Date.now() };
+  saveState();
+  refresh();
+  if (S.prefs.kidMenu && !kidPool.length) {
+    toast('План собран, но для детского меню нет подходящих рецептов');
+  } else {
+    toast('План собран: ' + days + ' ' + plural(days, 'день', 'дня', 'дней') + (kidCount ? ' · детское меню' : ''));
+  }
+  const grid = $('#plan-grid');
+  if (grid && grid.scrollIntoView) grid.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function dayDate(i) {
+  const d = new Date();
+  d.setHours(12, 0, 0, 0);
+  d.setDate(d.getDate() + i);
+  try {
+    return new Intl.DateTimeFormat('ru-RU', { weekday: 'short', day: 'numeric', month: 'long' }).format(d);
+  } catch (e) {
+    return d.toLocaleDateString();
+  }
+}
+
+function planRow(s, idx) {
+  const r = byId(s.rid);
+  if (!r) return '';
+  const portions = slotPortions(s);
+  const cov = coverage(r, portions);
+  let meta = r.time + ' мин · ' + portions + ' ' + plural(portions, 'порция', 'порции', 'порций');
+  if (s.cooked) meta += ' · <span class="ok">списано со склада</span>';
+  else if (S.pantry.length) {
+    meta += cov.missing.length
+      ? ' · <span class="miss">нет ' + cov.missing.length + ' ' + plural(cov.missing.length, 'продукта', 'продуктов', 'продуктов') + '</span>'
+      : ' · <span class="ok">всё есть</span>';
+  } else {
+    meta += ' · ' + (r.kcal ? r.kcal + ' ккал' : 'без расчёта продуктов');
+  }
+  return '<li class="meal-row"><span class="meal-label">' + MEAL_LABEL[s.meal] + '</span>' +
+    '<div class="meal-main"><button class="meal-title" type="button" data-open="' + r.id + '">' + esc(r.title) + '</button>' +
+    '<span class="meal-meta">' + meta + '</span></div>' +
+    '<button class="cook' + (s.cooked ? ' done' : '') + '" type="button" data-cook="' + idx + '"' +
+    (s.cooked ? ' disabled' : '') + ' aria-label="Отметить приготовленным: ' + escAttr(r.title) + '" title="Списать продукты со склада">' +
+    '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+    '</button></li>';
+}
+
+function renderPlan() {
+  const grid = $('#plan-grid');
+  const status = $('#plan-status');
+  if (!S.plan) {
+    status.textContent = 'План ещё не собран';
+    status.classList.remove('on');
+    grid.innerHTML = '<div class="empty"><h3>Меню на нужное число дней</h3>' +
+      '<p>Выберите дни и приёмы пищи, затем нажмите «Собрать план». Рецепты подберутся под то, что лежит в холодильнике.</p></div>';
+    renderShop();
+    return;
+  }
+  const days = S.plan.days;
+  const adultSlots = S.plan.slots.filter((s) => !s.kid);
+  const kidSlots = S.plan.slots.filter((s) => s.kid);
+  const portionsLabel = Number(S.prefs.portions) || 2;
+  const kidPortionsLabel = Number(S.prefs.kidPortions) || 1;
+  status.textContent = 'План на ' + days + ' ' + plural(days, 'день', 'дня', 'дней') + ' · ' +
+    adultSlots.length + ' ' + plural(adultSlots.length, 'приём', 'приёма', 'приёмов') + ' пищи' +
+    (kidSlots.length ? ' + детское меню (' + kidSlots.length + ')' : '') +
+    ' · ' + portionsLabel + ' ' + plural(portionsLabel, 'порция', 'порции', 'порций') + ' на приём' +
+    (kidSlots.length ? ', ребёнку ' + kidPortionsLabel : '');
+  status.classList.add('on');
+  const cards = [];
+  for (let d = 0; d < days; d++) {
+    const items = S.plan.slots.map((s, idx) => ({ s, idx })).filter((x) => x.s.day === d);
+    if (!items.length) continue;
+    const rows = items.filter((x) => !x.s.kid).map(({ s, idx }) => planRow(s, idx)).join('');
+    const kidRows = items.filter((x) => x.s.kid).map(({ s, idx }) => planRow(s, idx)).join('');
+    cards.push('<article class="day-card"><div class="day-head"><span class="day-num">' + (d + 1) + '</span>' +
+      '<h3>День ' + (d + 1) + '</h3><span class="day-date">' + esc(dayDate(d)) + '</span></div>' +
+      (rows ? '<ul class="meals">' + rows + '</ul>' : '') +
+      (kidRows ? '<div class="kid-menu"><h4>Детское меню</h4><ul class="meals">' + kidRows + '</ul></div>' : '') +
+      '</article>');
+  }
+  grid.innerHTML = cards.join('');
+  renderShop();
+}
+
+function renderShop() {
+  const box = $('#shop-list');
+  const empty = $('#shop-empty');
+  if (!box) return;
+  const items = shoppingList();
+  if (!items.length) {
+    box.innerHTML = '';
+    empty.hidden = false;
+    empty.textContent = S.plan ? 'Всё нужное уже есть на полке.' : 'Появится после сборки плана.';
+    return;
+  }
+  empty.hidden = true;
+  box.innerHTML = items.map((i) =>
+    '<li class="shop-item"><input type="checkbox" aria-label="Куплено: ' + escAttr(i.name) + '">' +
+    '<span class="nm">' + esc(i.name) + '</span>' +
+    '<span class="qt">' + fmtQty(i.qty) + ' ' + esc(i.unit) + '</span></li>').join('');
+}
+
+function copyText(text) {
+  const done = () => toast('Список скопирован');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+  } else {
+    fallbackCopy(text, done);
+  }
+}
+function fallbackCopy(text, done) {
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    done();
+  } catch (e) {
+    toast('Не получилось скопировать — выделите список вручную');
+  }
+}
+
+function cookSlot(idx) {
+  if (!S.plan) return;
+  const slot = S.plan.slots[idx];
+  if (!slot || slot.cooked) return;
+  const r = byId(slot.rid);
+  if (!r) return;
+  const scale = scaleFor(r, slotPortions(slot));
+  r.ing.forEach((x) => {
+    const n = x[0], u = x[2];
+    if (BASICS.has(canonName(n))) return;
+    const fam = unitFam(u);
+    let left = baseQty(x[1] * scale, u);
+    S.pantry.forEach((p) => {
+      if (left <= 1e-9) return;
+      if (unitFam(p.unit) !== fam || !sameItem(p.name, n)) return;
+      const pb = baseQty(p.qty, p.unit);
+      const take = Math.min(pb, left);
+      p.qty = Math.max(0, Math.round((p.qty - take / unitFactor(p.unit)) * 100) / 100);
+      left -= take;
+    });
+  });
+  S.pantry = S.pantry.filter((p) => p.qty > 0.0001);
+  slot.cooked = true;
+  saveState();
+  refresh();
+  toast('«' + r.title + '» — продукты списаны с полки');
+}
+
+function readPrefs() {
+  const daysEl = $('#days');
+  const days = Math.min(14, Math.max(1, parseInt(daysEl.value, 10) || 5));
+  daysEl.value = days;
+  S.prefs.days = days;
+  S.prefs.meals = MEALS.filter((m) => {
+    const el = $('#m-' + m.id);
+    return el && el.checked;
+  }).map((m) => m.id);
+  S.prefs.portions = Math.min(12, Math.max(1, parseInt($('#portions').value, 10) || 2));
+  S.prefs.veg = $('#pref-veg').checked;
+  S.prefs.fish = $('#pref-fish').checked;
+  S.prefs.quick = $('#pref-quick').checked;
+  S.prefs.kidMenu = $('#pref-kid').checked;
+  S.prefs.kidPortions = Math.min(4, Math.max(1, parseInt($('#kid-portions').value, 10) || 1));
+}
+function applyPrefs() {
+  $('#days').value = S.prefs.days;
+  MEALS.forEach((m) => { $('#m-' + m.id).checked = S.prefs.meals.includes(m.id); });
+  $('#portions').value = String(S.prefs.portions);
+  $('#pref-veg').checked = !!S.prefs.veg;
+  $('#pref-fish').checked = !!S.prefs.fish;
+  $('#pref-quick').checked = !!S.prefs.quick;
+  $('#pref-kid').checked = !!S.prefs.kidMenu;
+  $('#kid-portions').value = String(S.prefs.kidPortions || 1);
+  $('#kid-portions-wrap').hidden = !S.prefs.kidMenu;
+}
+let recFilter = 'all';
+let recQuery = '';
+let lastFocus = null;
+
+function recipeCard(r) {
+  const cov = coverage(r);
+  const pct = Math.round(cov.pct * 100);
+  const ingNames = r.ing.filter((x) => !BASICS.has(canonName(x[0]))).map((x) => x[0]);
+  const shortIng = ingNames.slice(0, 3).join(', ') + (ingNames.length > 3 ? ' +' + (ingNames.length - 3) : '');
+  const tags = (r.kid ? '<span class="tag kid">детям</span>' : '') + r.tags.slice(0, 3).map((t) => '<span class="tag">' + esc(t) + '</span>').join('');
+  const covBlock = S.pantry.length
+    ? '<div class="cov"><span class="cov-bar"><i style="width:' + pct + '%"></i></span>' +
+      '<span class="cov-txt"><span>' + cov.have + ' из ' + cov.total + ' продуктов</span><b>' + pct + '%</b></span></div>'
+    : '<div class="cov"><span class="cov-txt"><span>' + (r.kcal ? '≈ ' + r.kcal + ' ккал на порцию' : 'Без расчёта калорий') + '</span></span></div>';
+  return '<article class="rec-card" tabindex="0" role="button" data-open="' + r.id + '" aria-label="Открыть рецепт: ' + escAttr(r.title) + '">' +
+    '<div class="rec-top"><h3>' + esc(r.title) + '</h3>' +
+    (S.fav.includes(r.id) ? '<span class="rec-fav" title="В избранном" aria-label="В избранном">★</span>' : '') + '</div>' +
+    '<p class="rec-meta">' + r.meal.map((m) => MEAL_LABEL[m]).join(' · ') + ' · ' + r.time + ' мин · ' + r.servings + ' порц.</p>' +
+    '<p class="rec-ing">' + esc(shortIng) + '</p>' +
+    (tags ? '<div class="tagline">' + tags + '</div>' : '') +
+    covBlock + '</article>';
+}
+
+function renderRecipes() {
+  const q = recQuery.trim().toLowerCase();
+  const list = allRecipes().filter((r) => {
+    if (recFilter === 'fav' && !S.fav.includes(r.id)) return false;
+    if (recFilter === 'mine' && r.builtin) return false;
+    if (['breakfast', 'lunch', 'dinner', 'snack'].includes(recFilter) && !r.meal.includes(recFilter)) return false;
+    if (!q) return true;
+    const hay = (r.title + ' ' + r.tags.join(' ') + ' ' + r.ing.map((i) => i[0]).join(' ')).toLowerCase();
+    return hay.includes(q);
+  });
+  $('#rec-count').textContent = list.length + ' ' + plural(list.length, 'рецепт', 'рецепта', 'рецептов');
+  const grid = $('#rec-grid');
+  if (!list.length) {
+    let title = 'Ничего не нашлось';
+    let text = 'Попробуйте другой запрос или снимите фильтр.';
+    if (recFilter === 'fav') { title = 'В избранном пусто'; text = 'Откройте рецепт и нажмите «В избранное» — он появится здесь.'; }
+    if (recFilter === 'mine') { title = 'Своих рецептов пока нет'; text = 'Нажмите «Свой рецепт» или «Импорт», чтобы добавить свои.'; }
+    grid.innerHTML = '<div class="empty"><h3>' + title + '</h3><p>' + text + '</p>' +
+      (allRecipes().length ? '<button class="btn ghost" type="button" data-filter="all" id="reset-filter">Показать все рецепты</button>' : '') + '</div>';
+    return;
+  }
+  grid.innerHTML = list.map(recipeCard).join('');
+}
+
+function openModal(html) {
+  lastFocus = document.activeElement;
+  $('#modal-body').innerHTML = html;
+  $('#modal').hidden = false;
+  document.body.style.overflow = 'hidden';
+  const x = $('#modal-x');
+  if (x) x.focus();
+}
+function closeModal() {
+  $('#modal').hidden = true;
+  $('#modal-body').innerHTML = '';
+  document.body.style.overflow = '';
+  if (lastFocus && lastFocus.focus && document.contains(lastFocus)) lastFocus.focus();
+}
+
+function openRecipe(id) {
+  const r = byId(id);
+  if (!r) return;
+  const cov = coverage(r);
+  const scale = servingsScale(r);
+  const portions = Number(S.prefs.portions) || 2;
+  const ing = r.ing.map((x) => {
+    const st = checkIngredient(x[0], x[1] * scale, x[2]);
+    let label = 'базовое', cls = 'base';
+    if (st.state === 'ok') { label = st.approx ? 'есть' : 'есть'; cls = 'ok'; }
+    else if (st.state === 'part') { label = 'частично'; cls = 'part'; }
+    else if (st.state === 'no') { label = 'нет'; cls = 'no'; }
+    return '<li class="ing-item"><span class="nm">' + esc(x[0]) + '</span>' +
+      '<span class="qt">' + fmtQty(x[1] * scale) + ' ' + esc(x[2]) + '</span>' +
+      '<span class="st ' + cls + '">' + label + '</span></li>';
+  }).join('');
+  const steps = r.steps.length
+    ? r.steps.map((s) => '<li>' + esc(s) + '</li>').join('')
+    : '<li>Способ приготовления не записан.</li>';
+  const fav = S.fav.includes(r.id);
+  const kcal = r.kcal ? ' · ≈ ' + r.kcal + ' ккал на порцию' : '';
+  const body = '<p class="eyebrow">' + r.meal.map((m) => MEAL_LABEL[m]).join(' · ') + ' · ' + r.time + ' мин' + kcal + (r.kid ? ' · детям' : '') + '</p>' +
+    '<h2 id="modal-title">' + esc(r.title) + '</h2>' +
+    '<p class="muted small">Ингредиенты пересчитаны на ' + portions + ' ' + plural(portions, 'порцию', 'порции', 'порций') +
+    ' · в рецепте ' + r.servings + ' ' + plural(r.servings, 'порция', 'порции', 'порций') + '</p>' +
+    '<div class="modal-grid"><section><h3>ЭТО ПОНАДОБИТСЯ</h3><ul class="ing-list">' + ing + '</ul>' +
+    (S.pantry.length ? '<p class="hint" style="margin-top:10px">Есть ' + cov.have + ' из ' + cov.total + ' продуктов на полке.</p>' : '') +
+    '</section><section><h3>КАК ГОТОВИТЬ</h3><ol class="steps">' + steps + '</ol></section></div>' +
+    '<div class="modal-actions"><button class="btn ghost" type="button" data-fav="' + r.id + '">' +
+    (fav ? 'Убрать из избранного' : 'В избранное') + '</button>' +
+    (r.builtin ? '' : '<button class="btn ghost danger" type="button" data-delrec="' + r.id + '">Удалить рецепт</button>') +
+    '<button class="btn" type="button" data-close>Закрыть</button></div>';
+  openModal(body);
+}
+function openAddRecipe() {
+  openModal('<p class="eyebrow">Библиотека</p><h2 id="modal-title">Свой рецепт</h2>' +
+    '<form class="recipe-form" id="recipe-form" novalidate>' +
+    '<div class="field"><label for="f-title">Название</label><input id="f-title" required placeholder="Например, паста с грибами"></div>' +
+    '<div class="form-row">' +
+    '<div class="field"><label for="f-time">Время, мин</label><input id="f-time" type="number" min="1" value="30"></div>' +
+    '<div class="field"><label for="f-serv">Порций</label><input id="f-serv" type="number" min="1" value="2"></div>' +
+    '<div class="field"><label for="f-kcal">Ккал на порцию</label><input id="f-kcal" type="number" min="0" placeholder="—"></div>' +
+    '</div>' +
+    '<fieldset class="field"><legend>Приёмы пищи</legend><div class="chk-row">' +
+    '<label class="chk"><input type="checkbox" name="fmeal" value="breakfast"> Завтрак</label>' +
+    '<label class="chk"><input type="checkbox" name="fmeal" value="lunch" checked> Обед</label>' +
+    '<label class="chk"><input type="checkbox" name="fmeal" value="dinner"> Ужин</label>' +
+    '<label class="chk"><input type="checkbox" name="fmeal" value="snack"> Перекус</label>' +
+    '</div></fieldset>' +
+    '<div class="field"><label for="f-ing">Ингредиенты — по одному в строке</label>' +
+    '<textarea id="f-ing" placeholder="куриная грудка 500 г&#10;рис 200 г&#10;лук 1 шт"></textarea>' +
+    '<span class="hint">Формат: название, количество, единица. Единицы: г, кг, мл, л, шт, пучок, зуб., ст.л., ч.л.</span></div>' +
+    '<div class="field"><label for="f-steps">Приготовление — по шагу в строке</label>' +
+    '<textarea id="f-steps" placeholder="Обжарить курицу 10 минут.&#10;Добавить рис и воду.&#10;Тушить под крышкой 20 минут."></textarea></div>' +
+    '<div class="field"><label for="f-tags">Теги через запятую</label><input id="f-tags" placeholder="быстро, острое"></div>' +
+    '<div class="chk-row"><label class="chk"><input type="checkbox" id="f-kid"> Подходит детям</label></div>' +
+    '<p class="err" id="rec-err" hidden></p>' +
+    '<div class="modal-actions"><button class="btn primary" type="submit">Сохранить рецепт</button>' +
+    '<button class="btn ghost" type="button" data-close>Отмена</button></div></form>');
+}
+
+function onRecipeSubmit(e) {
+  e.preventDefault();
+  const err = $('#rec-err');
+  const fail = (msg) => { if (err) { err.hidden = false; err.textContent = msg; } };
+  if (err) { err.hidden = true; err.textContent = ''; }
+  const title = $('#f-title').value.trim();
+  if (!title) { fail('Введите название рецепта.'); return; }
+  const ing = $('#f-ing').value.split(/\n/).map(parseIngLine).filter(Boolean);
+  if (!ing.length) { fail('Добавьте хотя бы один ингредиент.'); return; }
+  const meal = $$('input[name="fmeal"]:checked').map((x) => x.value);
+  const raw = {
+    title,
+    meal: meal.length ? meal : ['lunch'],
+    time: Number($('#f-time').value) || 30,
+    servings: Number($('#f-serv').value) || 2,
+    kcal: Number($('#f-kcal').value) || 0,
+    ing,
+    steps: $('#f-steps').value,
+    tags: $('#f-tags').value,
+    kid: $('#f-kid').checked
+  };
+  const r = normalizeRecipe(raw, false);
+  if (!r || !r.ing.length) { fail('Не получилось прочитать ингредиенты.'); return; }
+  if (allRecipes().some((x) => x.title.toLowerCase() === r.title.toLowerCase())) {
+    fail('Рецепт с таким названием уже есть в библиотеке.');
+    return;
+  }
+  r.id = 'u' + Date.now().toString(36);
+  r.updatedAt = Date.now();
+  S.custom.push(r);
+  saveState();
+  scheduleSync();
+  recFilter = 'mine';
+  syncChips();
+  closeModal();
+  renderRecipes();
+  toast('Рецепт добавлен в библиотеку');
+}
+
+function openImport() {
+  openModal('<p class="eyebrow">Импорт</p><h2 id="modal-title">Добавить рецепты пачкой</h2>' +
+    '<p class="muted small">Вставьте JSON или выберите файл. Подойдёт один рецепт, массив рецептов или объект с полем recipes.</p>' +
+    '<div class="stack"><textarea id="imp-text" placeholder=\'{"recipes":[{"title":"Курица с рисом","meal":["обед"],"time":30,"servings":2,"ing":["куриная грудка 500 г","рис 200 г"],"steps":["Обжарить курицу.","Добавить рис и воду.","Тушить 20 минут."]}]}\'></textarea>' +
+    '<div class="row-inline"><input class="file-input" type="file" id="imp-file" accept=".json,application/json">' +
+    '<button class="btn primary" type="button" id="imp-go">Импортировать</button></div>' +
+    '<p class="err" id="imp-err" hidden></p>' +
+    '<p class="note">Рецепты хранятся в этом браузере. Для переноса на другое устройство используйте «Скачать JSON» здесь и импорт там.</p></div>');
+}
+
+function doImport(text) {
+  const err = $('#imp-err');
+  const fail = (msg) => { if (err) { err.hidden = false; err.textContent = msg; } };
+  if (err) err.hidden = true;
+  const raw = String(text || '').trim();
+  if (!raw) { fail('Вставьте JSON или выберите файл.'); return; }
+  let data;
+  try {
+    data = JSON.parse(raw.replace(/^\uFEFF/, ''));
+  } catch (e) {
+    fail('JSON не читается: ' + e.message);
+    return;
+  }
+  const arr = Array.isArray(data) ? data : (data && Array.isArray(data.recipes) ? data.recipes : [data]);
+  if (!arr.length) { fail('В данных нет рецептов.'); return; }
+  let added = 0, skipped = 0, dupes = 0;
+  arr.slice(0, 300).forEach((item) => {
+    const r = normalizeRecipe(item, false);
+    if (!r || !r.ing.length) { skipped++; return; }
+    if (allRecipes().some((x) => x.title.toLowerCase() === r.title.toLowerCase())) { dupes++; skipped++; return; }
+    r.id = 'u' + Math.random().toString(36).slice(2, 9);
+    r.updatedAt = Date.now();
+    S.custom.push(r);
+    added++;
+  });
+  if (!added) {
+    if (dupes) {
+      recFilter = 'mine';
+      syncChips();
+      closeModal();
+      renderRecipes();
+      toast(dupes === 1 ? 'Такой рецепт уже есть в библиотеке' : 'Эти рецепты уже есть в библиотеке');
+    } else {
+      fail('Не удалось прочитать ни одного рецепта. Проверьте формат JSON.');
+    }
+    return;
+  }
+  saveState();
+  scheduleSync();
+  recFilter = 'mine';
+  syncChips();
+  closeModal();
+  renderRecipes();
+  toast('Добавлено ' + added + ' ' + plural(added, 'рецепт', 'рецепта', 'рецептов') + (skipped ? ', пропущено ' + skipped : ''));
+}
+
+function downloadFile(text, name) {
+  try {
+    const blob = new Blob([text], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 2500);
+    toast('Файл сохранён: ' + name);
+  } catch (e) {
+    toast('Браузер не дал скачать файл');
+  }
+}
+
+function exportRecipes() {
+  if (!S.custom.length) { toast('Своих рецептов пока нет — экспортировать нечего'); return; }
+  const data = {
+    exported: new Date().toISOString(),
+    recipes: S.custom.map((r) => ({
+      title: r.title, meal: r.meal, time: r.time, servings: r.servings,
+      kcal: r.kcal, tags: r.tags, ing: r.ing, steps: r.steps, kid: !!r.kid
+    }))
+  };
+  downloadFile(JSON.stringify(data, null, 2), 'polka-recipes.json');
+}
+
+function toggleFav(id) {
+  const i = S.fav.indexOf(id);
+  if (i >= 0) S.fav.splice(i, 1); else S.fav.push(id);
+  saveState();
+  const btn = $('[data-fav="' + id + '"]');
+  if (btn) btn.textContent = S.fav.includes(id) ? 'Убрать из избранного' : 'В избранное';
+  renderRecipes();
+}
+
+function deleteRecipe(id) {
+  if (!confirm('Удалить рецепт из библиотеки? Это необратимо.')) return;
+  S.custom = S.custom.filter((r) => r.id !== id);
+  S.fav = S.fav.filter((x) => x !== id);
+  S.tombstones.push(id);
+  S.tombstones = S.tombstones.slice(-500);
+  if (S.plan) S.plan.slots = S.plan.slots.filter((s) => s.rid !== id);
+  saveState();
+  scheduleSync();
+  closeModal();
+  refresh();
+  toast('Рецепт удалён');
+}
+
+function syncChips() {
+  $$('#rec-filters .chip').forEach((c) => c.classList.toggle('is-on', c.dataset.filter === recFilter));
+}
+
+function setTab(name) {
+  $$('.tab').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.tab === name)));
+  ['pantry', 'plan', 'recipes'].forEach((v) => {
+    const view = $('#view-' + v);
+    if (view) view.hidden = v !== name;
+  });
+  if (name === 'plan') renderPlan();
+  if (name === 'recipes') renderRecipes();
+  if (window.scrollY > 0) window.scrollTo(0, 0);
+}
+
+function refresh() {
+  renderPantry();
+  renderPlan();
+  renderRecipes();
+}
+
+const SYNC_KEY = 'polka.sync.v1';
+const GIST_FILE = 'polka-library.json';
+let SYNC = loadSync();
+let syncing = false;
+let syncQueued = false;
+let syncTimer = null;
+let syncError = false;
+let syncBusy = false;
+
+function loadSync() {
+  try {
+    const raw = localStorage.getItem(SYNC_KEY);
+    if (!raw) return { token: '', gistId: '', lastSync: 0, configured: false };
+    const p = JSON.parse(raw);
+    return {
+      token: String(p.token || ''),
+      gistId: String(p.gistId || ''),
+      lastSync: Number(p.lastSync) || 0,
+      configured: true
+    };
+  } catch (e) {
+    return { token: '', gistId: '', lastSync: 0, configured: false };
+  }
+}
+function saveSync() {
+  try {
+    localStorage.setItem(SYNC_KEY, JSON.stringify({ token: SYNC.token, gistId: SYNC.gistId, lastSync: SYNC.lastSync }));
+  } catch (e) {}
+}
+function localConfig() {
+  const l = window.POLKA_LOCAL;
+  return l && typeof l === 'object' ? l : null;
+}
+function applyLocalToken() {
+  const l = localConfig();
+  if (!l || SYNC.configured) return;
+  const token = String(l.token || '').trim();
+  const gistId = String(l.gistId || '').trim();
+  if (!SYNC.token && token) SYNC.token = token;
+  if (!SYNC.gistId && gistId) SYNC.gistId = gistId;
+}
+function syncReady() { return !!(SYNC.token && SYNC.gistId); }
+
+function libRecipe(r) {
+  return {
+    id: r.id, title: r.title, meal: r.meal, time: r.time, servings: r.servings,
+    kcal: r.kcal, tags: r.tags, ing: r.ing, steps: r.steps, updatedAt: r.updatedAt || 0, kid: !!r.kid
+  };
+}
+function libPayload() {
+  return {
+    v: 1,
+    app: 'polka',
+    updatedAt: new Date().toISOString(),
+    recipes: S.custom.map(libRecipe),
+    tombstones: S.tombstones.slice(-500)
+  };
+}
+function mergeLib(local, remote) {
+  const map = new Map();
+  const put = (r) => {
+    if (!r || !r.id || !r.title) return;
+    const cur = map.get(r.id);
+    if (!cur || (Number(r.updatedAt) || 0) >= (Number(cur.updatedAt) || 0)) map.set(r.id, r);
+  };
+  (remote.recipes || []).forEach(put);
+  (local.recipes || []).forEach(put);
+  const tomb = new Set();
+  (remote.tombstones || []).forEach((id) => tomb.add(String(id)));
+  (local.tombstones || []).forEach((id) => tomb.add(String(id)));
+  tomb.forEach((id) => map.delete(id));
+  const seen = new Set();
+  const recipes = [];
+  Array.from(map.values())
+    .sort((a, b) => (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0))
+    .forEach((r) => {
+      const key = String(r.title || '').toLowerCase().trim();
+      if (key) {
+        if (seen.has(key)) return;
+        seen.add(key);
+      }
+      recipes.push(r);
+    });
+  return { v: 1, app: 'polka', updatedAt: new Date().toISOString(), recipes, tombstones: Array.from(tomb).slice(-500) };
+}
+function applyLib(data) {
+  const merged = mergeLib({ v: 1, recipes: S.custom.map(libRecipe), tombstones: S.tombstones }, data);
+  S.custom = merged.recipes.map((r) => normalizeRecipe(r, false)).filter(Boolean);
+  S.tombstones = merged.tombstones.slice(-500);
+  saveState();
+}
+
+async function gh(path, opts, token) {
+  const o = opts || {};
+  const headers = {
+    'Accept': 'application/vnd.github+json',
+    'Authorization': 'Bearer ' + (token || SYNC.token),
+    'X-GitHub-Api-Version': '2022-11-28'
+  };
+  if (o.body) headers['Content-Type'] = 'application/json';
+  let res;
+  try {
+    res = await fetch('https://api.github.com' + path, { method: o.method || 'GET', headers, body: o.body });
+  } catch (e) {
+    throw new Error('Нет связи с GitHub — проверьте интернет');
+  }
+  if (!res.ok) {
+    let msg = 'GitHub ответил ' + res.status;
+    if (res.status === 401) msg = 'Токен не подошёл или истёк';
+    else if (res.status === 403) msg = 'Нет прав: нужен токен с галочкой gist';
+    else if (res.status === 404) msg = 'Библиотека не найдена — проверьте код и доступ к гисту';
+    else if (res.status === 409) msg = 'Конфликт версий — попробуйте ещё раз';
+    else if (res.status === 422) msg = 'GitHub отклонил данные';
+    throw new Error(msg);
+  }
+  return res.status === 204 ? null : res.json();
+}
+
+async function readGistPayload(gist) {
+  const file = gist && gist.files && gist.files[GIST_FILE];
+  if (!file) throw new Error('В библиотеке нет файла ' + GIST_FILE);
+  let text = file.content;
+  if ((file.truncated || !text) && file.raw_url) {
+    const r = await fetch(file.raw_url);
+    if (!r.ok) throw new Error('Не удалось прочитать файл библиотеки');
+    text = await r.text();
+  }
+  let data;
+  try {
+    data = JSON.parse(text || '{}');
+  } catch (e) {
+    throw new Error('Файл библиотеки повреждён');
+  }
+  if (!data || !Array.isArray(data.recipes)) throw new Error('Файл библиотеки пустой или другого формата');
+  return data;
+}
+
+function extractGistId(value) {
+  const s = String(value || '').trim();
+  const m = s.match(/gist\.github\.com\/(?:[^/]+\/)?([a-f0-9]{8,})/i);
+  if (m) return m[1].toLowerCase();
+  const hex = s.replace(/[^a-f0-9]/gi, '').toLowerCase();
+  return hex.length >= 8 ? hex : '';
+}
+
+function scheduleSync() {
+  if (!syncReady()) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => { syncNow({ silent: true }); }, 1400);
+}
+
+async function syncNow(opts) {
+  const silent = !!(opts && opts.silent);
+  if (!syncReady()) {
+    if (!silent) openSync();
+    return false;
+  }
+  if (syncing) { syncQueued = true; return false; }
+  syncing = true;
+  syncError = false;
+  renderSyncBadge('busy');
+  try {
+    const gist = await gh('/gists/' + SYNC.gistId, { method: 'GET' });
+    const remote = await readGistPayload(gist);
+    const merged = mergeLib(libPayload(), remote);
+    applyLib(merged);
+    await gh('/gists/' + SYNC.gistId, {
+      method: 'PATCH',
+      body: JSON.stringify({ files: { [GIST_FILE]: { content: JSON.stringify(merged, null, 2) } } })
+    });
+    SYNC.lastSync = Date.now();
+    saveSync();
+    syncError = false;
+    renderSyncBadge();
+    renderRecipes();
+    if (!silent) toast('Синхронизировано');
+    return true;
+  } catch (e) {
+    syncError = true;
+    renderSyncBadge();
+    if (!silent) toast(e.message);
+    return false;
+  } finally {
+    syncing = false;
+    if (syncQueued) { syncQueued = false; scheduleSync(); }
+  }
+}
+
+async function createLibrary() {
+  if (syncBusy) return;
+  const input = $('#sync-token');
+  const token = input ? input.value.trim() : '';
+  if (!token) { setSyncErr('Вставьте токен GitHub.'); return; }
+  setSyncErr('');
+  setSyncBusy(true);
+  try {
+    const payload = libPayload();
+    const gist = await gh('/gists', {
+      method: 'POST',
+      body: JSON.stringify({
+        description: 'Полка — общая библиотека рецептов',
+        public: false,
+        files: { [GIST_FILE]: { content: JSON.stringify(payload, null, 2) } }
+      })
+    }, token);
+    SYNC = { token, gistId: gist.id, lastSync: Date.now() };
+    saveSync();
+    syncError = false;
+    openSync();
+    renderSyncBadge();
+    renderRecipes();
+    toast('Библиотека создана — сохраните код');
+  } catch (e) {
+    setSyncErr(e.message);
+  } finally {
+    setSyncBusy(false);
+  }
+}
+
+async function connectLibrary() {
+  if (syncBusy) return;
+  const token = ($('#sync-token') ? $('#sync-token').value : '').trim();
+  const code = extractGistId($('#sync-code') ? $('#sync-code').value : '');
+  if (!token) { setSyncErr('Вставьте токен GitHub.'); return; }
+  if (!code) { setSyncErr('Введите код библиотеки или ссылку на гист.'); return; }
+  setSyncErr('');
+  setSyncBusy(true);
+  try {
+    const gist = await gh('/gists/' + code, { method: 'GET' }, token);
+    const remote = await readGistPayload(gist);
+    SYNC = { token, gistId: code, lastSync: 0 };
+    saveSync();
+    const merged = mergeLib(libPayload(), remote);
+    applyLib(merged);
+    await gh('/gists/' + code, {
+      method: 'PATCH',
+      body: JSON.stringify({ files: { [GIST_FILE]: { content: JSON.stringify(merged, null, 2) } } })
+    }, token);
+    SYNC.lastSync = Date.now();
+    saveSync();
+    syncError = false;
+    openSync();
+    renderSyncBadge();
+    renderRecipes();
+    toast('Библиотека подключена');
+  } catch (e) {
+    SYNC = { token: '', gistId: '', lastSync: 0 };
+    saveSync();
+    setSyncErr(e.message);
+  } finally {
+    setSyncBusy(false);
+  }
+}
+
+function disconnectLibrary() {
+  if (!confirm('Отключить общую библиотеку? Рецепты останутся на этом устройстве.')) return;
+  SYNC = { token: '', gistId: '', lastSync: 0 };
+  saveSync();
+  closeModal();
+  renderSyncBadge();
+  toast('Синхронизация отключена');
+}
+
+function fmtTime(ts) {
+  try {
+    return new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(ts));
+  } catch (e) {
+    return new Date(ts).toLocaleString();
+  }
+}
+
+function setSyncErr(msg) {
+  const el = $('#sync-err');
+  if (!el) return;
+  el.hidden = !msg;
+  el.textContent = msg || '';
+}
+
+function setSyncBusy(on) {
+  syncBusy = on;
+  ['#sync-create', '#sync-connect', '#sync-now'].forEach((sel) => {
+    const b = $(sel);
+    if (b) b.disabled = on;
+  });
+}
+
+function renderSyncBadge(mode) {
+  const dot = $('#sync-dot');
+  const label = $('#sync-label');
+  if (!dot || !label) return;
+  const on = syncReady();
+  dot.className = 'sync-dot' + (on ? ' on' : '') + (syncError ? ' err' : '');
+  if (mode === 'busy') { label.textContent = 'Синхронизация…'; return; }
+  if (!on) { label.textContent = 'Общая библиотека'; return; }
+  if (syncError) { label.textContent = 'Ошибка синхронизации'; return; }
+  label.textContent = SYNC.lastSync ? 'Общая · ' + fmtTime(SYNC.lastSync) : 'Общая библиотека';
+}
+
+function openSync() {
+  const head = '<p class="eyebrow">Синхронизация</p><h2 id="modal-title">Общая библиотека</h2>';
+  if (syncReady()) {
+    openModal(head +
+      '<p class="muted small">Ваши рецепты совпадают на всех устройствах, где введён этот код. Продукты, план и избранное остаются на каждом устройстве свои.</p>' +
+      '<div class="stack">' +
+      '<div><p class="field-note">Код библиотеки</p><p class="code">' + esc(SYNC.gistId) + '</p></div>' +
+      '<p class="muted small">Последняя синхронизация: ' + (SYNC.lastSync ? esc(fmtTime(SYNC.lastSync)) : 'ещё не было') + '</p>' +
+      '<div class="sync-actions">' +
+      '<button class="btn primary" type="button" id="sync-now">Синхронизировать</button>' +
+      '<button class="btn ghost" type="button" id="sync-copy">Скопировать код</button>' +
+      '<button class="btn ghost danger" type="button" id="sync-off">Отключить</button>' +
+      '<button class="btn ghost" type="button" data-close>Закрыть</button>' +
+      '</div>' +
+      '<p class="note">Токен хранится только в этом браузере. На втором устройстве введите тот же токен и код. Секретный гист доступен любому, у кого есть код.</p>' +
+      '</div>');
+    return;
+  }
+  openModal(head +
+    '<p class="muted small">Включите общую библиотеку, чтобы добавлять рецепты с телефона и видеть их на планшете. Нужен аккаунт GitHub и токен с правом <b>gist</b>.</p>' +
+    '<div class="stack">' +
+    '<div class="field"><label for="sync-token">Токен GitHub</label><input id="sync-token" type="password" placeholder="ghp_…" value="' + escAttr(SYNC.token) + '" autocomplete="off"></div>' +
+    '<p class="hint">Создайте токен: <a href="https://github.com/settings/tokens" target="_blank" rel="noopener">github.com/settings/tokens</a> → Generate new token (classic) → галочка <b>gist</b>.</p>' +
+    '<p class="hint">Если токен записан в polka.local.js рядом с index.html, вводить его не нужно.</p>' +
+    '<div class="row-inline"><button class="btn primary" type="button" id="sync-create">Создать библиотеку</button></div>' +
+    '<div class="stack-sep">или подключиться к существующей</div>' +
+    '<div class="field"><label for="sync-code">Код библиотеки</label><input id="sync-code" placeholder="ID гиста или ссылка" autocomplete="off"></div>' +
+    '<div class="row-inline"><button class="btn" type="button" id="sync-connect">Подключиться</button></div>' +
+    '<p class="err" id="sync-err" hidden></p>' +
+    '<p class="note">Токен хранится в localStorage браузера и не попадает в экспорт рецептов. Он даёт доступ к вашим гистам — при утере отзовите его на GitHub.</p>' +
+    '</div>');
+}
+
+function bindEvents() {
+  $$('.tab').forEach((t) => t.addEventListener('click', () => setTab(t.dataset.tab)));
+
+  $('#add-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = $('#prod-name').value.trim();
+    if (!name) { $('#prod-name').focus(); return; }
+    const qty = parseFloat(String($('#prod-qty').value).replace(',', '.'));
+    if (!(qty > 0)) { toast('Укажите количество больше нуля'); $('#prod-qty').focus(); return; }
+    const unit = $('#prod-unit').value;
+    const daysRaw = $('#prod-days').value.trim();
+    const days = daysRaw === '' ? null : Math.max(0, Math.min(90, parseInt(daysRaw, 10) || 0));
+    addProductToPantry(name, qty, unit, days);
+    saveState();
+    refresh();
+    $('#prod-name').value = '';
+    $('#prod-qty').value = '1';
+    $('#prod-days').value = '';
+    $('#prod-name').focus();
+    toast('«' + name + '» на полке');
+  });
+
+  $('#pantry-list').addEventListener('change', (e) => {
+    const row = e.target.closest('.prod-row');
+    if (!row) return;
+    const p = S.pantry.find((x) => x.id === row.dataset.id);
+    if (!p) return;
+    if (e.target.matches('[data-qty]')) {
+      const v = parseFloat(String(e.target.value).replace(',', '.'));
+      if (!(v >= 0)) { e.target.value = p.qty; return; }
+      p.qty = Math.round(v * 100) / 100;
+      if (p.qty === 0) {
+        S.pantry = S.pantry.filter((x) => x.id !== p.id);
+        toast('Продукт убран с полки');
+      }
+      saveState(); refresh();
+    } else if (e.target.matches('[data-days]')) {
+      const raw = e.target.value.trim();
+      p.days = raw === '' ? null : Math.max(0, Math.min(90, parseInt(raw, 10) || 0));
+      p.added = Date.now();
+      saveState(); refresh();
+    } else if (e.target.matches('[data-name]')) {
+      const v = e.target.value.trim();
+      if (!v) { e.target.value = p.name; return; }
+      p.name = v;
+      p.cat = guessCat(v);
+      saveState(); refresh();
+    }
+  });
+
+  $('#pantry-list').addEventListener('click', (e) => {
+    const del = e.target.closest('[data-del]');
+    if (del) {
+      const p = S.pantry.find((x) => x.id === del.dataset.del);
+      S.pantry = S.pantry.filter((x) => x.id !== del.dataset.del);
+      saveState(); refresh();
+      if (p) toast('«' + p.name + '» убран с полки');
+      return;
+    }
+    if (e.target.id === 'demo-fill') fillDemo();
+  });
+
+  $('#plan-form').addEventListener('change', () => { readPrefs(); saveState(); });
+  $('#pref-kid').addEventListener('change', () => {
+    $('#kid-portions-wrap').hidden = !$('#pref-kid').checked;
+    if (S.plan) toast('Нажмите «Пересобрать», чтобы добавить детские блюда');
+  });
+  $('#plan-form').addEventListener('submit', (e) => { e.preventDefault(); buildPlan(); });
+  $$('.step').forEach((b) => b.addEventListener('click', () => {
+    const el = $('#days');
+    const v = Math.min(14, Math.max(1, (parseInt(el.value, 10) || 5) + Number(b.dataset.step)));
+    el.value = v;
+    readPrefs();
+    saveState();
+  }));
+  $('#regen').addEventListener('click', buildPlan);
+
+  $('#shop-list').addEventListener('change', (e) => {
+    if (e.target.matches('input[type="checkbox"]')) {
+      const li = e.target.closest('.shop-item');
+      if (li) li.classList.toggle('done', e.target.checked);
+    }
+  });
+  $('#copy-shop').addEventListener('click', () => {
+    const items = shoppingList();
+    if (!items.length) { toast('Список покупок пуст'); return; }
+    const text = 'Докупить:\n' + items.map((i) => '· ' + i.name + ' — ' + fmtQty(i.qty) + ' ' + i.unit).join('\n');
+    copyText(text);
+  });
+
+  ['input', 'change', 'search'].forEach((ev) => {
+    $('#rec-search').addEventListener(ev, (e) => { recQuery = e.target.value; renderRecipes(); });
+  });
+  document.addEventListener('click', (e) => {
+    const chip = e.target.closest('[data-filter]');
+    if (chip) {
+      recFilter = chip.dataset.filter;
+      syncChips();
+      renderRecipes();
+      return;
+    }
+    const open = e.target.closest('[data-open]');
+    if (open) { openRecipe(open.dataset.open); return; }
+    const cook = e.target.closest('[data-cook]');
+    if (cook) { cookSlot(Number(cook.dataset.cook)); return; }
+  });
+  $('#rec-grid').addEventListener('keydown', (e) => {
+    const card = e.target.closest('.rec-card');
+    if (!card) return;
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openRecipe(card.dataset.open); }
+  });
+
+  $('#add-recipe').addEventListener('click', openAddRecipe);
+  $('#import-recipe').addEventListener('click', openImport);
+  $('#export-recipe').addEventListener('click', exportRecipes);
+  $('#sync-open').addEventListener('click', openSync);
+
+  $('#modal-x').addEventListener('click', closeModal);
+  $('#modal').addEventListener('click', (e) => { if (e.target === $('#modal')) closeModal(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#modal').hidden) closeModal(); });
+
+  $('#modal-body').addEventListener('click', (e) => {
+    if (e.target.closest('[data-close]')) { closeModal(); return; }
+    const fav = e.target.closest('[data-fav]');
+    if (fav) { toggleFav(fav.dataset.fav); return; }
+    const del = e.target.closest('[data-delrec]');
+    if (del) { deleteRecipe(del.dataset.delrec); return; }
+    if (e.target.id === 'sync-create') { createLibrary(); return; }
+    if (e.target.id === 'sync-connect') { connectLibrary(); return; }
+    if (e.target.id === 'sync-now') { syncNow(); return; }
+    if (e.target.id === 'sync-copy') { copyText(SYNC.gistId); return; }
+    if (e.target.id === 'sync-off') { disconnectLibrary(); return; }
+    if (e.target.id === 'imp-go') doImport($('#imp-text').value);
+  });
+  $('#modal-body').addEventListener('change', (e) => {
+    if (e.target.id === 'imp-file' && e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      const reader = new FileReader();
+      reader.onload = () => {
+        const ta = $('#imp-text');
+        if (ta) ta.value = String(reader.result || '');
+      };
+      reader.onerror = () => toast('Не получилось прочитать файл');
+      reader.readAsText(file, 'utf-8');
+    }
+  });
+  $('#modal-body').addEventListener('submit', (e) => {
+    if (e.target.id === 'recipe-form') onRecipeSubmit(e);
+  });
+}
+
+function init() {
+  applyLocalToken();
+  applyPrefs();
+  fillSuggest();
+  bindEvents();
+  renderPantry();
+  renderPlan();
+  renderRecipes();
+  renderSyncBadge();
+  setInterval(refreshShelf, 60000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshShelf(); });
+  if (syncReady()) setTimeout(() => { syncNow({ silent: true }); }, 700);
+}
+
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+else init();
+/*JS-END*/
+</script>
+</body>
+</html>
