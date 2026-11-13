@@ -1175,6 +1175,26 @@ function passPrefs(r) {
   return true;
 }
 
+const SPOON_GRAMS = {
+  'мука': 15, 'сахар': 25, 'соль': 30, 'манка': 20, 'рис': 25, 'гречка': 25,
+  'овсянка': 12, 'крахмал': 30, 'какао': 15, 'мёд': 30, 'масло растительное': 17,
+  'масло сливочное': 20, 'соевый соус': 18, 'кетчуп': 25, 'томатная паста': 25,
+  'сметана': 25, 'молоко': 18, 'вода': 18, 'уксус': 15, 'дрожжи': 10,
+  'кунжут': 8, 'паприка': 7, 'корица': 8, 'разрыхлитель': 12, 'сода': 12,
+  'ванилин': 4, 'творожный сыр': 20
+};
+function shopUnit(name, unit) {
+  const c = canonName(name);
+  const fam = unitFam(unit);
+  if (fam === 'mass') return { fam: 'mass', factor: unitFactor(unit), unit: 'г', key: c + '|масса' };
+  if (fam === 'vol') return { fam: 'vol', factor: unitFactor(unit), unit: 'мл', key: c + '|объём' };
+  if (fam === 'spoon') {
+    const g = SPOON_GRAMS[c] || 15;
+    const grams = unit === 'ст.л.' ? g : g / 3;
+    return { fam: 'mass', factor: grams, unit: 'г', key: c + '|масса' };
+  }
+  return { fam, factor: 1, unit, key: c + '|' + unit };
+}
 function shoppingList() {
   if (!S.plan) return [];
   const pool = S.pantry.map((p) => Object.assign({}, p));
@@ -1187,18 +1207,18 @@ function shoppingList() {
       const n = x[0], u = x[2];
       const c = canonName(n);
       if (BASICS.has(c)) return;
-      const fam = unitFam(u);
-      const need = baseQty(x[1] * scale, u);
+      const conv = shopUnit(n, u);
+      const need = x[1] * scale * conv.factor;
       let avail = 0;
       pool.forEach((p) => {
-        if (unitFam(p.unit) === fam && sameItem(p.name, n)) avail += baseQty(p.qty, p.unit);
+        if (unitFam(p.unit) === conv.fam && sameItem(p.name, n)) avail += baseQty(p.qty, p.unit);
       });
       const take = Math.min(avail, need);
       if (take > 0) {
         let left = take;
         pool.forEach((p) => {
           if (left <= 1e-9) return;
-          if (unitFam(p.unit) !== fam || !sameItem(p.name, n)) return;
+          if (unitFam(p.unit) !== conv.fam || !sameItem(p.name, n)) return;
           const pb = baseQty(p.qty, p.unit);
           const d = Math.min(pb, left);
           p.qty = Math.max(0, p.qty - d / unitFactor(p.unit));
@@ -1207,10 +1227,9 @@ function shoppingList() {
       }
       const miss = need - take;
       if (miss > 1e-6) {
-        const key = c + '|' + u;
-        const cur = map.get(key) || { name: n, unit: u, qty: 0, fam };
-        cur.qty += miss / unitFactor(u);
-        map.set(key, cur);
+        const cur = map.get(conv.key) || { name: n, unit: conv.unit, qty: 0, fam: conv.fam };
+        cur.qty += miss;
+        map.set(conv.key, cur);
       }
     });
   });
